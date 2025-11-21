@@ -204,4 +204,127 @@ userSchema.methods.getDefaultShippingAddress = function() {
          this.addresses.find(addr => addr.type === 'shipping');
 };
 
+// Add these methods to your existing User model:
+
+// Method to get user's cart
+userSchema.methods.getCart = function() {
+  return this.cart;
+};
+
+// Method to add item to cart
+userSchema.methods.addToCart = async function(item) {
+  const existingItemIndex = this.cart.findIndex(
+    cartItem => 
+      cartItem.product.toString() === item.product && 
+      cartItem.size === item.size && 
+      cartItem.color === item.color
+  );
+
+  if (existingItemIndex > -1) {
+    // Update quantity if item exists
+    this.cart[existingItemIndex].quantity += item.quantity;
+  } else {
+    // Add new item to cart
+    this.cart.push({
+      product: item.product,
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color
+    });
+  }
+
+  await this.save();
+  return this.cart;
+};
+
+// Method to remove item from cart
+userSchema.methods.removeFromCart = async function(productId, size, color) {
+  this.cart = this.cart.filter(
+    item => !(
+      item.product.toString() === productId && 
+      item.size === size && 
+      item.color === color
+    )
+  );
+
+  await this.save();
+  return this.cart;
+};
+
+// Method to update cart item quantity
+userSchema.methods.updateCartItemQuantity = async function(productId, size, color, quantity) {
+  const item = this.cart.find(
+    item => 
+      item.product.toString() === productId && 
+      item.size === size && 
+      item.color === color
+  );
+
+  if (item) {
+    if (quantity === 0) {
+      return await this.removeFromCart(productId, size, color);
+    } else {
+      item.quantity = quantity;
+      await this.save();
+      return this.cart;
+    }
+  }
+
+  return this.cart;
+};
+
+// Method to clear cart
+userSchema.methods.clearCart = async function() {
+  this.cart = [];
+  await this.save();
+  return this.cart;
+};
+
+// Method to sync cart with local storage
+userSchema.methods.syncCart = async function(localCart) {
+  try {
+    // If local cart is empty, return server cart
+    if (!localCart || localCart.length === 0) {
+      return this.cart;
+    }
+
+    // Merge server cart with local cart
+    const mergedCart = [...this.cart];
+    
+    localCart.forEach(localItem => {
+      const existingItemIndex = mergedCart.findIndex(
+        serverItem => 
+          serverItem.product.toString() === localItem.product && 
+          serverItem.size === localItem.size && 
+          serverItem.color === localItem.color
+      );
+
+      if (existingItemIndex > -1) {
+        // Use the larger quantity between server and local
+        mergedCart[existingItemIndex].quantity = Math.max(
+          mergedCart[existingItemIndex].quantity,
+          localItem.quantity
+        );
+      } else {
+        // Add local item to merged cart
+        mergedCart.push({
+          product: localItem.product,
+          quantity: localItem.quantity,
+          size: localItem.size,
+          color: localItem.color
+        });
+      }
+    });
+
+    // Update server cart with merged cart
+    this.cart = mergedCart;
+    await this.save();
+
+    return this.cart;
+  } catch (error) {
+    console.error('Cart sync error:', error);
+    return this.cart;
+  }
+};
+
 module.exports = mongoose.model('User', userSchema);
