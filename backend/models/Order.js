@@ -35,6 +35,11 @@ const orderSchema = new mongoose.Schema({
     update_time: String,
     email_address: String
   },
+    // Stripe-specific fields
+  stripePaymentIntentId: String,
+  stripeCustomerId: String,
+  stripePaymentMethod: String,
+  
   itemsPrice: {
     type: Number,
     required: true

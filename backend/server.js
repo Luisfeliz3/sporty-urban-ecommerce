@@ -40,6 +40,13 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/profile', require('./routes/profile')); 
 app.use('/api/cart', require('./routes/cart'));
 
+// Add this with other routes (before the JSON middleware for webhooks)
+app.use('/api/stripe', require('./routes/stripe'));
+
+
+// Webhook needs raw body, so add it before express.json()
+app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), require('./routes/stripe').post('/webhook'));
+
 // Health check route
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 

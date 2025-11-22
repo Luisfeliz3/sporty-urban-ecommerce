@@ -22,6 +22,22 @@ router.post('/', auth, async (req, res) => {
       totalPrice,
     } = req.body;
 
+
+        // Create Stripe customer if not exists
+    if (!req.user.stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: req.user.email,
+        name: req.user.name,
+        metadata: {
+          userId: req.user._id.toString()
+        }
+      });
+      
+      // Update user with Stripe customer ID
+      await User.findByIdAndUpdate(req.user._id, {
+        stripeCustomerId: customer.id
+      });
+    }
     // Validation
     if (!orderItems || orderItems.length === 0) {
       return res.status(400).json({
@@ -220,6 +236,22 @@ router.get('/', auth, async (req, res) => {
         message: 'Admin access required'
       });
     }
+        // Create Stripe customer if not exists
+    if (!req.user.stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: req.user.email,
+        name: req.user.name,
+        metadata: {
+          userId: req.user._id.toString()
+        }
+      });
+      
+      // Update user with Stripe customer ID
+      await User.findByIdAndUpdate(req.user._id, {
+        stripeCustomerId: customer.id
+      });
+    }
+
 
     const orders = await Order.find({})
       .populate('user', 'name email')
