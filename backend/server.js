@@ -4,7 +4,15 @@ const cors = require('cors');
 const dotenv = require('dotenv');
  
 const connectDB = require('./config/database');
-  
+// Import routes
+const authRoutes = require('./routes/auth');
+const productRoutes = require('./routes/products');
+const orderRoutes = require('./routes/orders');
+const profileRoutes = require('./routes/profile');
+// const uploadRoutes = require('./routes/upload');
+const cartRoutes = require('./routes/cart');
+const adminProductRoutes = require('./routes/admin/products');
+const stripeRoutes = require('./routes/stripe');  
  
 dotenv.config();
 
@@ -13,6 +21,7 @@ connectDB();
 const app = express();
  
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 const router = express.Router();
 
 
@@ -39,14 +48,17 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/profile', require('./routes/profile')); 
 app.use('/api/cart', require('./routes/cart'));
+app.use('/api/admin/products', require("./routes/admin/products"));
 
 // Add this with other routes (before the JSON middleware for webhooks)
 app.use('/api/stripe', require('./routes/stripe'));
 
 
-// Webhook needs raw body, so add it before express.json()
-app.post('/api/stripe/webhook', express.raw({type: 'application/json'}), require('./routes/stripe').post('/webhook'));
+// Add admin routes
+// app.use('/api/admin/products', require('./routes/admin/products'));
 
+// Webhook needs raw body, so add it before express.json()
+app.use('/api/stripe/webhook', express.raw({type: 'application/json'}), require('./routes/stripe'));
 // Health check route
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 

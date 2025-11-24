@@ -75,7 +75,7 @@ const users = [
     name: 'John Doe',
     email: 'john@example.com',
     password: '123456',
-    isAdmin: true,
+    isAdmin: false,
     profile: {
       phone: '+1234565555',
       dateOfBirth: new Date('1995-11-21'),

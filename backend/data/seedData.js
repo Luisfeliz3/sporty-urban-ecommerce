@@ -11,7 +11,12 @@ const products = [
     originalPrice: 44.99,
     category: "T-Shirts",
     brand: "StreetAthlete",
-    images: ["/images/tshirt1.jpg"],
+    images:  [
+    {
+      url: "https://storage.cloud.google.com/urbanproducts/tshirts/black/blacktshirt.png",
+      alt: "T-Shirt front view"
+    }
+  ],
     sizes: ["S", "M", "L", "XL"],
     colors: [
       { name: "Black", code: "#000000" },
@@ -25,33 +30,112 @@ const products = [
     rating: 4.5,
     reviewCount: 23
   },
+    {
+    name: "Black Urban T-Shirt",
+    description: "Standard Black T-Shirt for all occasions",
+    price: 14.99,
+    originalPrice: 14.99,
+    category: "T-Shirts",
+    brand: "The Standard Label",
+    images:  [
+    {
+      url: "https://storage.cloud.google.com/urbanproducts/tshirts/black/blacktshirt.png",
+      alt: "T-Shirt front view"
+    }
+  ],
+    sizes: ["S", "M", "L", "XL"],
+    colors: [
+      { name: "Black", code: "#000000" },
+      { name: "Navy", code: "#1E3A5F" },
+      { name: "Charcoal", code: "#36454F" }
+    ],
+    inventory: 50,
+    featured: true,
+    sportType: "training",
+    tags: ["All-Season", "moisture-wicking", "urban"],
+    rating: 4.5,
+    reviewCount: 23
+  },
+      {
+    name: "Grey Urban T-Shirt",
+    description: "Standard Black T-Shirt for all occasions",
+    price: 14.99,
+    originalPrice: 14.99,
+    category: "T-Shirts",
+    brand: "The Standard Label",
+    images:  [
+    {
+      url: "https://storage.cloud.google.com/urbanproducts/tshirts/grey/greytshirt.png",
+      alt: "T-Shirt front view"
+    }
+  ],
+    sizes: ["S", "M", "L", "XL"],
+    colors: [
+      { name: "Black", code: "#000000" },
+      { name: "Navy", code: "#1E3A5F" },
+      { name: "Grey", code: "#4f5152ff" }
+    ],
+    inventory: 50,
+    featured: true,
+    sportType: "training",
+    tags: ["All-Season", "moisture-wicking", "urban"],
+    rating: 4.5,
+    reviewCount: 23
+  },
+        {
+    name: "White Urban T-Shirt",
+    description: "Standard White T-Shirt for all occasions",
+    price: 14.99,
+    originalPrice: 14.99,
+    category: "T-Shirts",
+    brand: "The Great Label",
+    images:  [
+    {
+      url: "https://storage.cloud.google.com/urbanproducts/tshirts/white/whitetshirt.png",
+      alt: "T-Shirt front view"
+    }
+  ],
+    sizes: ["S", "M", "L", "XL"],
+    colors: [
+      { name: "Black", code: "#000000" },
+      { name: "Navy", code: "#1E3A5F" },
+      { name: "Charcoal", code: "#36454F" },
+      { name: "White", code: "#f9fafbff" }
+    ],
+    inventory: 30,
+    featured: true,
+    sportType: "training",
+    tags: ["All-Season", "moisture-wicking", "urban"],
+    rating: 4.5,
+    reviewCount: 23
+  },
   // Add 49 more products with similar structure...
 ];
 
-const users = [
-  {
-    name: "Admin User",
-    email: "admin@example.com",
-    password: "123456",
-    isAdmin: true
-  },
-  {
-    name: "John Doe",
-    email: "john@example.com",
-    password: "123456"
-  },
-  // Add 8 more users...
-];
+// const users = [.
+//   {
+//     name: "Admin User",
+//     email: "admin@example.com",
+//     password: "123456",
+//     isAdmin: true
+//   },
+//   {
+//     name: "John Doe",
+//     email: "john@example.com",
+//     password: "123456"
+//   },
+//   // Add 8 more users...
+// ];
 
 const seedDatabase = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     
     await Product.deleteMany();
-    await User.deleteMany();
+    // await User.deleteMany();
     
     await Product.insertMany(products);
-    await User.insertMany(users);
+    // await User.insertMany(users);
     
     console.log('Database seeded successfully');
     process.exit();
