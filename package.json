@@ -1,0 +1,32 @@
+{
+  "name": "sporty-urban-ecommerce ",
+  "version": "1.0.0",
+  "description": "e-commerce app that has the basics to launch a store",
+  "scripts": {
+    "start": "concurrently \"cd frontend && npm run start\" \"cd backend && npm run dev\"",
+    "server": " cd backend server.js",
+    "build": "npm install --prefix ./frontend && npm run build --prefix ./frontend && npm install",
+    "cleanModPak": "rm -rf node_modules package-lock.json",
+    "start:dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run server",
+    "dev:frontend": "cd frontend && npm start",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "update:all": "npm run update:backend && npm run update:frontend",
+    "update:backend": "cd backend && ncu -u && npm install",
+    "update:frontend": "cd frontend && ncu -u && npm install",
+    "update:cypress": "cd cypress/cypress && ncu -u && npm install",
+    "nav:backend": "cd backend",
+    "nav:frontend": "cd frontend",
+    "nav:root": "cd .",
+    "nav:back": "cd .."
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "npm-check-updates": "^16.14.0"
+  },
+  "dependencies": {
+    "nodemon": "^3.1.11"
+  }
+}

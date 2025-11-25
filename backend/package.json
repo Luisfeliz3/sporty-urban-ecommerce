@@ -9,7 +9,10 @@
     "dev": "nodemon server.js",
     "seed": "node data/seedData.js",
     "seedUsers": "node data/seedUsers.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "cleanModPak": "rm -rf node_modules package-lock.json",
+    "seedUserDb" : "node data/seedUsers.js",
+    "seedProductDb" : "node data/seedData.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
