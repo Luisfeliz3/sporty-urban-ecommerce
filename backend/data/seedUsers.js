@@ -103,20 +103,6 @@ const users = [
       smsNotifications: false,
       emailNotifications: true
     },
-    cart: [
-      {
-        product: '507f1f77bcf86cd799439011', // Sample product ID
-        quantity: 2,
-        size: 'M',
-        color: 'Black'
-      },
-      {
-        product: '507f1f77bcf86cd799439012', // Another sample product ID
-        quantity: 1,
-        size: 'L',
-        color: 'Blue'
-      }
-    ],
   },
   
   // ... other users

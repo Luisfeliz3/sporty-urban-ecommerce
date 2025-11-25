@@ -1,3 +1,5 @@
+
+
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
@@ -30,12 +32,12 @@ const orderSchema = new mongoose.Schema({
     required: true
   },
   paymentResult: {
-    id: String,
+    id: String, // Stripe payment intent ID
     status: String,
     update_time: String,
-    email_address: String
+    email_address: String,
   },
-    // Stripe-specific fields
+  // Stripe-specific fields
   stripePaymentIntentId: String,
   stripeCustomerId: String,
   stripePaymentMethod: String,

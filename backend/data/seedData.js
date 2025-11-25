@@ -10,7 +10,7 @@ const products = [
     price: 34.99,
     originalPrice: 44.99,
     category: "T-Shirts",
-    brand: "StreetAthlete",
+    brand: "Street Athletes",
     images:  [
     {
       url: "https://storage.cloud.google.com/urbanproducts/tshirts/black/blacktshirt.png",
@@ -30,65 +30,13 @@ const products = [
     rating: 4.5,
     reviewCount: 23
   },
-    {
-    name: "Black Urban T-Shirt",
-    description: "Standard Black T-Shirt for all occasions",
-    price: 14.99,
-    originalPrice: 14.99,
+  {
+    name: "White Athletic Performance Tee",
+    description: "High-performance t-shirt for urban athletes. Moisture-wicking fabric with superior breathe-ability.",
+    price: 34.99,
+    originalPrice: 44.99,
     category: "T-Shirts",
-    brand: "The Standard Label",
-    images:  [
-    {
-      url: "https://storage.cloud.google.com/urbanproducts/tshirts/black/blacktshirt.png",
-      alt: "T-Shirt front view"
-    }
-  ],
-    sizes: ["S", "M", "L", "XL"],
-    colors: [
-      { name: "Black", code: "#000000" },
-      { name: "Navy", code: "#1E3A5F" },
-      { name: "Charcoal", code: "#36454F" }
-    ],
-    inventory: 50,
-    featured: true,
-    sportType: "training",
-    tags: ["All-Season", "moisture-wicking", "urban"],
-    rating: 4.5,
-    reviewCount: 23
-  },
-      {
-    name: "Grey Urban T-Shirt",
-    description: "Standard Black T-Shirt for all occasions",
-    price: 14.99,
-    originalPrice: 14.99,
-    category: "T-Shirts",
-    brand: "The Standard Label",
-    images:  [
-    {
-      url: "https://storage.cloud.google.com/urbanproducts/tshirts/grey/greytshirt.png",
-      alt: "T-Shirt front view"
-    }
-  ],
-    sizes: ["S", "M", "L", "XL"],
-    colors: [
-      { name: "Black", code: "#000000" },
-      { name: "Navy", code: "#1E3A5F" },
-      { name: "Grey", code: "#4f5152ff" }
-    ],
-    inventory: 50,
-    featured: true,
-    sportType: "training",
-    tags: ["All-Season", "moisture-wicking", "urban"],
-    rating: 4.5,
-    reviewCount: 23
-  },
-        {
-    name: "White Urban T-Shirt",
-    description: "Standard White T-Shirt for all occasions",
-    price: 14.99,
-    originalPrice: 14.99,
-    category: "T-Shirts",
-    brand: "The Great Label",
+    brand: "Street Athletes",
     images:  [
     {
       url: "https://storage.cloud.google.com/urbanproducts/tshirts/white/whitetshirt.png",
@@ -97,15 +45,85 @@ const products = [
   ],
     sizes: ["S", "M", "L", "XL"],
     colors: [
-      { name: "Black", code: "#000000" },
-      { name: "Navy", code: "#1E3A5F" },
-      { name: "Charcoal", code: "#36454F" },
-      { name: "White", code: "#f9fafbff" }
+
+      { name: "White", code: "#f3f3f3ff" }
     ],
-    inventory: 30,
+    inventory: 50,
     featured: true,
     sportType: "training",
-    tags: ["All-Season", "moisture-wicking", "urban"],
+    tags: ["performance", "moisture-wicking", "urban"],
+    rating: 4.5,
+    reviewCount: 23
+  },
+  {
+    name: "Grey Athletic Performance Tee",
+    description: "High-performance t-shirt for urban athletes. Moisture-wicking fabric with superior breathability.",
+    price: 34.99,
+    originalPrice: 44.99,
+    category: "T-Shirts",
+    brand: "Street Athletes",
+    images:  [
+    {
+      url: "https://storage.cloud.google.com/urbanproducts/tshirts/grey/greytshirt.png",
+      alt: "T-Shirt front view"
+    }
+  ],
+    sizes: ["S", "M", "L", "XL"],
+    colors: [
+      { name: "Grey", code: "#36454F" }
+    ],
+    inventory: 50,
+    featured: true,
+    sportType: "training",
+    tags: ["performance", "moisture-wicking", "urban"],
+    rating: 4.5,
+    reviewCount: 23
+  },
+  {
+    name: "Red Athletic Performance Tee",
+    description: "High-performance t-shirt for urban athletes. Moisture-wicking fabric with superior breathability.",
+    price: 34.99,
+    originalPrice: 44.99,
+    category: "T-Shirts",
+    brand: "Street Athletes",
+    images:  [
+    {
+      url: "https://storage.cloud.google.com/urbanproducts/tshirts/red/red.png",
+      alt: "T-Shirt front view"
+    }
+  ],
+    sizes: ["S", "M", "L", "XL"],
+    colors: [
+      { name: "Red", code: "#e54210ff" }
+    ],
+    inventory: 50,
+    featured: true,
+    sportType: "training",
+    tags: ["performance", "moisture-wicking", "urban"],
+    rating: 4.5,
+    reviewCount: 23
+  },
+  {
+    name: "Blue Athletic Performance Tee",
+    description: "High-performance t-shirt for urban athletes. Moisture-wicking fabric with superior breathe-ability.",
+    price: 14.99,
+    originalPrice: 14.99,
+    category: "T-Shirts",
+    brand: "Street Athletes",
+    images:  [
+    {
+      url: "https://storage.cloud.google.com/urbanproducts/tshirts/blue/blue.png",
+      alt: "T-Shirt front view"
+    }
+  ],
+    sizes: ["S", "M", "L", "XL"],
+    colors: [
+      { name: "Blue", code: "#0f29e7ff" }
+    ],
+    inventory: 50,
+    featured: true,
+    sportType: "training",
+    tags: ["performance", "moisture-wicking", "urban"],
     rating: 4.5,
     reviewCount: 23
   },

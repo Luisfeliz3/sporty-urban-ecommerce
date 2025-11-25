@@ -19,8 +19,15 @@ dotenv.config();
 connectDB();
 
 const app = express();
+
+// Add this with other routes (before the JSON middleware for webhooks)
+// app.use('/api/stripe', require('./routes/stripe'));
+
+
+// Webhook needs raw body, so add it before express.json()
+app.use('/api/stripe/webhook', express.raw({type: 'application/json'}), require('./routes/stripe'));
  
-app.use(express.json());
+// app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const router = express.Router();
 
@@ -38,6 +45,7 @@ app.use(cors({
 // Handle preflight requests
 app.options('*', cors());
 
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -50,15 +58,13 @@ app.use('/api/profile', require('./routes/profile'));
 app.use('/api/cart', require('./routes/cart'));
 app.use('/api/admin/products', require("./routes/admin/products"));
 
-// Add this with other routes (before the JSON middleware for webhooks)
-app.use('/api/stripe', require('./routes/stripe'));
+
 
 
 // Add admin routes
 // app.use('/api/admin/products', require('./routes/admin/products'));
 
-// Webhook needs raw body, so add it before express.json()
-app.use('/api/stripe/webhook', express.raw({type: 'application/json'}), require('./routes/stripe'));
+
 // Health check route
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
