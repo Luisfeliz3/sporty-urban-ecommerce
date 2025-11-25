@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
- 
+const  logger =  require("morgan");
 const connectDB = require('./config/database');
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -13,12 +13,53 @@ const profileRoutes = require('./routes/profile');
 const cartRoutes = require('./routes/cart');
 const adminProductRoutes = require('./routes/admin/products');
 const stripeRoutes = require('./routes/stripe');  
- 
+const path = require('path');
+const app = express();
+// Serve static assets from react build
+app.use(express.static(path.join(__dirname, "/client/build")));
+
+app.get("/", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+app.get("/login", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+app.get("/register", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+app.get("/product", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+
+app.get("/cart", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+app.get("/checkout", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+  )
+
+  app.get("/placeorder", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+  app.get("/profile", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+  app.get("/order", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+  app.get("/admin", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+  app.get("/products", (req,res)=>
+  res.sendFile(path.join(__dirname, '/client/build/index.html'))
+)
+
+
 dotenv.config();
 
 connectDB();
 
-const app = express();
+
 
 // Add this with other routes (before the JSON middleware for webhooks)
 // app.use('/api/stripe', require('./routes/stripe'));
@@ -32,7 +73,8 @@ app.use(express.urlencoded({ extended: true }));
 const router = express.Router();
 
 
-
+// logging (development)
+app.use(logger("dev"));
 
 // Enhanced CORS configuration
 app.use(cors({
