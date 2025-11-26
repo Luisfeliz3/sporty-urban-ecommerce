@@ -62,9 +62,9 @@ const ConnectionTest = () => {
             Troubleshooting Steps:
           </Typography>
           <Typography variant="body2">
-            1. Make sure backend is running on port 5000<br/>
+            1. Make sure backend is running on port 3001<br/>
             2. Check if MongoDB is running<br/>
-            3. Verify no other services are using port 5000<br/>
+            3. Verify no other services are using port 3001<br/>
             4. Check browser console for CORS errors
           </Typography>
         </Box>

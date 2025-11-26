@@ -7,7 +7,7 @@ const getBaseURL = () => {
     return '/api';
   }
   // In development, use the backend server
-  return process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  return process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
 };
 
 // Create axios instance
