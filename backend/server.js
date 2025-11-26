@@ -2,8 +2,50 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const  logger =  require("morgan");
+const path = require('path');
 const connectDB = require('./config/database');
+
+
+// Load environment variables
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
+
+const app = express();
+connectDB();
+// CORS configuration for production
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'https://your-frontend-app.onrender.com', // Your frontend Render URL
+    process.env.CLIENT_URL
+  ].filter(Boolean),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// Stripe webhook needs raw body - must come before express.json()
+app.use('/api/stripe/webhook', express.raw({type: 'application/json'}), require('./routes/stripe'));
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// // Connect to MongoDB
+// mongoose.connect(process.env.MONGODB_URI, {
+//   useNewUrlParser: true,
+//   useUnifiedTopology: true,
+// })
+// .then(() => console.log('✅ MongoDB connected successfully'))
+// .catch(err => {
+//   console.error('❌ MongoDB connection error:', err);
+//   process.exit(1);
+// });
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
@@ -12,119 +54,38 @@ const profileRoutes = require('./routes/profile');
 // const uploadRoutes = require('./routes/upload');
 const cartRoutes = require('./routes/cart');
 const adminProductRoutes = require('./routes/admin/products');
-const stripeRoutes = require('./routes/stripe');  
-const path = require('path');
-const app = express();
-// Serve static assets from react build
-app.use(express.static(path.join(__dirname, "/client/build")));
+const stripeRoutes = require('./routes/stripe');
 
-app.get("/", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-app.get("/login", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-app.get("/register", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-app.get("/product", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-
-app.get("/cart", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-app.get("/checkout", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-  )
-
-  app.get("/placeorder", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-  app.get("/profile", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-  app.get("/order", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-  app.get("/admin", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-  app.get("/products", (req,res)=>
-  res.sendFile(path.join(__dirname, '/client/build/index.html'))
-)
-
-
-dotenv.config();
-
-connectDB();
-
-
-
-// Add this with other routes (before the JSON middleware for webhooks)
-// app.use('/api/stripe', require('./routes/stripe'));
-
-
-// Webhook needs raw body, so add it before express.json()
-app.use('/api/stripe/webhook', express.raw({type: 'application/json'}), require('./routes/stripe'));
- 
-// app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-const router = express.Router();
-
-
-// logging (development)
-app.use(logger("dev"));
-
-// Enhanced CORS configuration
-app.use(cors({
-  origin: true, // Allow all origins in development
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
-
-// Handle preflight requests
-app.options('*', cors());
-
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/products', require('./routes/products'));
-app.use('/api/orders', require('./routes/orders'));
-app.use('/api/profile', require('./routes/profile')); 
-app.use('/api/cart', require('./routes/cart'));
-app.use('/api/admin/products', require("./routes/admin/products"));
-
-
-
-
-// Add admin routes
-// app.use('/api/admin/products', require('./routes/admin/products'));
-
+// Use routes
+app.use('/api/auth', authRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/profile', profileRoutes);
+// app.use('/api/upload', uploadRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/admin/products', adminProductRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
+    success: true,
     message: 'Server is running!', 
-       message: 'Backend server is running!', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV
   });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ 
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'production' ? {} : err.message 
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from the React build
+  app.use(express.static(path.join(__dirname, '../frontend/build')));
+
+  // Handle React routing, return all requests to React app
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
   });
-});
+}
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
@@ -144,10 +105,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
-// const HOST = process.env.HOST || '0.0.0.0';
+const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
+app.listen(PORT, () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
 });

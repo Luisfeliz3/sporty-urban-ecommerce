@@ -1,13 +1,13 @@
 import axios from 'axios';
 
-// Determine API base URL
+// Determine API base URL based on environment
 const getBaseURL = () => {
-  // In development, use proxy or direct URL
-  if (process.env.NODE_ENV === 'development') {
-    return process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+  // In production, use relative URL (same domain)
+  if (process.env.NODE_ENV === 'production') {
+    return '/api';
   }
-  // In production, use environment variable
-  return process.env.REACT_APP_API_URL || '/api';
+  // In development, use the backend server
+  return process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 };
 
 // Create axios instance
@@ -22,8 +22,6 @@ const API = axios.create({
 // Request interceptor
 API.interceptors.request.use(
   (config) => {
-    console.log(`🔄 API Call: ${config.method?.toUpperCase()} ${config.url}`);
-    
     const userInfo = localStorage.getItem('userInfo');
     if (userInfo) {
       try {
@@ -35,35 +33,21 @@ API.interceptors.request.use(
         console.error('Error parsing userInfo:', error);
       }
     }
-    
     return config;
   },
   (error) => {
-    console.error('🚨 Request Error:', error);
     return Promise.reject(error);
   }
 );
-// Response interceptor - update this part
-API.interceptors.response.use(
-  (response) => {
-    console.log(`✅ API Success: ${response.config.url}`, response.data);
-    return response;
-  },
-  (error) => {
-    console.error('🚨 API Error Details:', {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      message: error.message,
-      responseData: error.response?.data, // This will show the actual error message from backend
-      requestData: error.config?.data // This shows what we sent
-    });
 
+// Response interceptor
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('userInfo');
-      console.log('🔐 Auto-logout due to 401 response');
+      // Don't redirect automatically to avoid loops
     }
-
     return Promise.reject(error);
   }
 );
