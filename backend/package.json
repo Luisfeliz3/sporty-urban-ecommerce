@@ -26,7 +26,8 @@
     "stripe": "^12.18.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^2.0.22",
+    "concurrently": "^8.2.0"
   },
   "keywords": [],
   "author": "",
