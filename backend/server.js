@@ -17,7 +17,7 @@ connectDB();
 const corsOptions = {
   origin: [
     'http://localhost:3000',
-    'https://sporty-urban-frontend.onrender.com', // Your frontend Render URL
+    'https://sporty-urban-ecommerce.onrender.com', // Your frontend Render URL
     process.env.CLIENT_URL
   ].filter(Boolean),
   credentials: true,
