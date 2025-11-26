@@ -4,7 +4,7 @@ import axios from 'axios';
 const getBaseURL = () => {
   // In development, use proxy or direct URL
   if (process.env.NODE_ENV === 'development') {
-    return process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+    return process.env.REACT_APP_API_URL || 'http://localhost:/api';
   }
   // In production, use environment variable
   return process.env.REACT_APP_API_URL || '/api';
