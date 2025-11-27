@@ -23,16 +23,50 @@ connectDB();
 // Serve static assets from react build
 app.use(express.static(path.join(__dirname, "/frontend/build")));
 
-app.get("/dashboard", (req,res)=>
+app.get("/login", (req,res)=>
   res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
 )
 
-app.get("/activity", (req,res)=>
+app.get("/register", (req,res)=>
   res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
 )
-app.get("/login", (req,res)=>
+app.get("/product/:id", (req,res)=>
   res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
   )
+
+  app.get("/register", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/cart", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/checkout", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/shipping", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/payment", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/placeorder", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/profile", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/order/:orderId", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/order-success", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/admin", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/products", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
 
 
 
