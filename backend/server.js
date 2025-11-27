@@ -1,18 +1,41 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const logger =  require("morgan");
 const dotenv = require('dotenv');
 const path = require('path');
 const connectDB = require('./config/database');
+const app = express();
+const fileURLToPath =  require("url");
 
+app.use(logger("dev"));
 
+const PORT = process.env.PORT || 3001;
 // Load environment variables
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
-const app = express();
 connectDB();
+
+
+
+// Serve static assets from react build
+app.use(express.static(path.join(__dirname, "/frontend/build")));
+
+app.get("/dashboard", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+
+app.get("/activity", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+)
+app.get("/login", (req,res)=>
+  res.sendFile(path.join(__dirname, '/frontend/build/index.html'))
+  )
+
+
+
 // CORS configuration for production
 const corsOptions = {
   origin: [
@@ -35,16 +58,6 @@ app.use('/api/stripe/webhook', express.raw({type: 'application/json'}), require(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// // Connect to MongoDB
-// mongoose.connect(process.env.MONGODB_URI, {
-//   useNewUrlParser: true,
-//   useUnifiedTopology: true,
-// })
-// .then(() => console.log('✅ MongoDB connected successfully'))
-// .catch(err => {
-//   console.error('❌ MongoDB connection error:', err);
-//   process.exit(1);
-// })
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -77,15 +90,15 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve static files in production
-// if (process.env.NODE_ENV === 'production') {
-//   // Serve static files from the React build
-//   app.use(express.static(path.join(__dirname, '../frontend/build')));
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from the React build
+  app.use(express.static(path.join(__dirname, '../frontend/build')));
 
-//   // Handle React routing, return all requests to React app
-//   app.get('*', (req, res) => {
-//     res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
-//   });
-// }
+  // Handle React routing, return all requests to React app
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
+  });
+}
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
@@ -105,7 +118,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
