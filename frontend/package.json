@@ -21,14 +21,15 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "lint": "eslint src --ext .js,.jsx",
     "lint:fix": "eslint src --ext .js,.jsx --fix",
     "build:analyze": "npm run build && npx source-map-explorer build/static/js/*.js",
     "type-check": "npx tsc --noEmit",
-    "cleanModPak": "rm -rf node_modules package-lock.json"
+    "cleanModPak": "rm -rf node_modules package-lock.json",
+      "build": "node --max-old-space-size=256 `which react-scripts` build",
+    "build:memory-optimized": "NODE_OPTIONS=\"--max-old-space-size=256\" react-scripts build"
   },
   "devDependencies": {
     "eslint": "^8.45.0",
