@@ -73,7 +73,7 @@ app.get("/products", (req,res)=>
 // CORS configuration for production
 const corsOptions = {
   origin: [
-    'http://localhost:3000',
+    'http://localhost:3001',
     'https://sporty-urban-ecommerce.onrender.com', // Your frontend Render URL
     process.env.CLIENT_URL
   ].filter(Boolean),
