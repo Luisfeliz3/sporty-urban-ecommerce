@@ -1,14 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const logger =  require("morgan");
+const logger = require("morgan");
 const dotenv = require('dotenv');
 const path = require('path');
 const connectDB = require('./config/database');
-const app = express();
-const fileURLToPath =  require("url");
 
- 
+const app = express();
 
 // Load environment variables
 if (process.env.NODE_ENV !== 'production') {
@@ -17,39 +15,26 @@ if (process.env.NODE_ENV !== 'production') {
 
 connectDB();
 
-// CORS configuration for production
+// CORS configuration
 const corsOptions = {
   origin: [
-    'http://localhost:3000/api',
-    'https://sporty-urban-ecommerce.onrender.com', // Your frontend Render URL
+    'http://localhost:3000',
+    'https://artist-hub-ebw6.onrender.com',
     process.env.CLIENT_URL
   ].filter(Boolean),
   credentials: true,
-  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
-
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(logger("dev"));
-
-
-
-
-
-
- 
-// Stripe webhook needs raw body - must come before express.json()
-app.use('/api/stripe/webhook', express.raw({type: 'application/json'}), require('./routes/stripe'));
-
-
-
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -89,18 +74,16 @@ app.use('/api/*', (req, res) => {
   });
 });
 
-// Serve static files in production
+// Serve static files in production - MUST COME LAST
 if (process.env.NODE_ENV === 'production') {
   // Serve static files from the React build
   app.use(express.static(path.join(__dirname, '../frontend/build')));
- 
+
   // Handle React routing, return all requests to React app
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
   });
 }
-
-
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -113,7 +96,6 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
