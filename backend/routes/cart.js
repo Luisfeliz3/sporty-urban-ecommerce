@@ -4,12 +4,44 @@ const Product = require('../models/Product');
 const auth = require('../middleware/auth');
 const router = express.Router();
 
+// Helper function to enhance cart items with product details
+const enhanceCartItems = async (cartItems) => {
+  if (!cartItems || !Array.isArray(cartItems)) return [];
+  
+  const enhancedItems = await Promise.all(
+    cartItems.map(async (item) => {
+      try {
+        const product = await Product.findById(item.product);
+        if (!product) return null;
+        
+        return {
+          product: item.product,
+          name: product.name,
+          price: Number(product.price),
+          image: product.images?.[0]?.url || '/images/placeholder.jpg',
+          quantity: Number(item.quantity),
+          size: item.size,
+          color: item.color,
+          inventory: Number(product.inventory) || 0,
+          inStock: product.inventory >= item.quantity
+        };
+      } catch (error) {
+        console.error('Error enhancing cart item:', error);
+        return null;
+      }
+    })
+  );
+  
+  // Filter out any null items (products that no longer exist)
+  return enhancedItems.filter(item => item !== null);
+};
+
 // @desc    Get user's cart
 // @route   GET /api/cart
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).populate('cart.product');
+    const user = await User.findById(req.user._id);
     
     if (!user) {
       return res.status(404).json({
@@ -18,22 +50,7 @@ router.get('/', auth, async (req, res) => {
       });
     }
 
-    // Enhance cart items with product details
-    const enhancedCart = await Promise.all(
-      user.cart.map(async (item) => {
-        const product = await Product.findById(item.product);
-        return {
-          product: item.product,
-          name: product?.name || 'Unknown Product',
-          price: product?.price || 0,
-          image: product?.images?.[0]?.url || '/images/placeholder.jpg',
-          quantity: item.quantity,
-          size: item.size,
-          color: item.color,
-          inventory: product?.inventory || 0
-        };
-      })
-    );
+    const enhancedCart = await enhanceCartItems(user.cart);
 
     res.json({
       success: true,
@@ -63,6 +80,15 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
+    // Validate quantity
+    const quantityNum = Number(quantity);
+    if (isNaN(quantityNum) || quantityNum < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quantity must be a positive number'
+      });
+    }
+
     const user = await User.findById(req.user._id);
     
     if (!user) {
@@ -81,7 +107,16 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
-    if (productDoc.inventory < quantity) {
+    // Calculate total quantity including existing cart item
+    const existingItem = user.cart.find(
+      item => item.product.toString() === product && 
+              item.size === size && 
+              item.color === color
+    );
+    
+    const totalQuantity = (existingItem ? existingItem.quantity : 0) + quantityNum;
+
+    if (productDoc.inventory < totalQuantity) {
       return res.status(400).json({
         success: false,
         message: `Not enough inventory. Only ${productDoc.inventory} available`
@@ -89,29 +124,14 @@ router.post('/', auth, async (req, res) => {
     }
 
     // Add item to cart
-    const cart = await user.addToCart({
+    const updatedCart = await user.addToCart({
       product,
-      quantity,
+      quantity: quantityNum,
       size,
       color
     });
 
-    // Get enhanced cart with product details
-    const enhancedCart = await Promise.all(
-      cart.map(async (item) => {
-        const product = await Product.findById(item.product);
-        return {
-          product: item.product,
-          name: product?.name || 'Unknown Product',
-          price: product?.price || 0,
-          image: product?.images?.[0]?.url || '/images/placeholder.jpg',
-          quantity: item.quantity,
-          size: item.size,
-          color: item.color,
-          inventory: product?.inventory || 0
-        };
-      })
-    );
+    const enhancedCart = await enhanceCartItems(updatedCart);
 
     res.json({
       success: true,
@@ -150,11 +170,12 @@ router.delete('/', auth, async (req, res) => {
       });
     }
 
-    const cart = await user.removeFromCart(product, size, color);
+    const updatedCart = await user.removeFromCart(product, size, color);
+    const enhancedCart = await enhanceCartItems(updatedCart);
 
     res.json({
       success: true,
-      data: cart,
+      data: enhancedCart,
       message: 'Item removed from cart'
     });
   } catch (error) {
@@ -180,6 +201,15 @@ router.put('/', auth, async (req, res) => {
       });
     }
 
+    // Validate quantity
+    const quantityNum = Number(quantity);
+    if (isNaN(quantityNum) || quantityNum < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quantity must be a non-negative number'
+      });
+    }
+
     const user = await User.findById(req.user._id);
     
     if (!user) {
@@ -189,11 +219,41 @@ router.put('/', auth, async (req, res) => {
       });
     }
 
-    const cart = await user.updateCartItemQuantity(product, size, color, quantity);
+    // If quantity is 0, remove the item
+    if (quantityNum === 0) {
+      const updatedCart = await user.removeFromCart(product, size, color);
+      const enhancedCart = await enhanceCartItems(updatedCart);
+      
+      return res.json({
+        success: true,
+        data: enhancedCart,
+        message: 'Item removed from cart'
+      });
+    }
+
+    // Check inventory if increasing quantity
+    const existingItem = user.cart.find(
+      item => item.product.toString() === product && 
+              item.size === size && 
+              item.color === color
+    );
+
+    if (existingItem && quantityNum > existingItem.quantity) {
+      const productDoc = await Product.findById(product);
+      if (productDoc && productDoc.inventory < quantityNum) {
+        return res.status(400).json({
+          success: false,
+          message: `Not enough inventory. Only ${productDoc.inventory} available`
+        });
+      }
+    }
+
+    const updatedCart = await user.updateCartItemQuantity(product, size, color, quantityNum);
+    const enhancedCart = await enhanceCartItems(updatedCart);
 
     res.json({
       success: true,
-      data: cart,
+      data: enhancedCart,
       message: 'Cart updated successfully'
     });
   } catch (error) {
@@ -219,11 +279,12 @@ router.delete('/clear', auth, async (req, res) => {
       });
     }
 
-    const cart = await user.clearCart();
+    const updatedCart = await user.clearCart();
+    const enhancedCart = await enhanceCartItems(updatedCart);
 
     res.json({
       success: true,
-      data: cart,
+      data: enhancedCart,
       message: 'Cart cleared successfully'
     });
   } catch (error) {
@@ -251,24 +312,18 @@ router.post('/sync', auth, async (req, res) => {
       });
     }
 
-    const syncedCart = await user.syncCart(localCart);
+    // Validate local cart items
+    const validatedLocalCart = Array.isArray(localCart) ? localCart.filter(item => 
+      item && 
+      item.product && 
+      item.size && 
+      item.color && 
+      typeof item.quantity === 'number' &&
+      item.quantity > 0
+    ) : [];
 
-    // Get enhanced cart with product details
-    const enhancedCart = await Promise.all(
-      syncedCart.map(async (item) => {
-        const product = await Product.findById(item.product);
-        return {
-          product: item.product,
-          name: product?.name || 'Unknown Product',
-          price: product?.price || 0,
-          image: product?.images?.[0]?.url || '/images/placeholder.jpg',
-          quantity: item.quantity,
-          size: item.size,
-          color: item.color,
-          inventory: product?.inventory || 0
-        };
-      })
-    );
+    const syncedCart = await user.syncCart(validatedLocalCart);
+    const enhancedCart = await enhanceCartItems(syncedCart);
 
     res.json({
       success: true,

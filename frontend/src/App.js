@@ -1,10 +1,13 @@
 import React from 'react';
+import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { setCartItems } from './store/slices/cartSlice';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
-import { sportyUrbanTheme } from './theme/theme';
+import { productsTheme } from './theme/theme';
 import RegisterPage from './pages/RegisterPage';
 import Header from './components/Layout/Header';
 import HomePage from './pages/Home';
@@ -20,11 +23,43 @@ import CartSync from './components/Cart/CartSync';
 import OrderSuccessPage from './pages/OrderSuccessPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ProductsPage from './pages/ProductsPage';
-
+import { mergeDuplicateItems } from './store/slices/cartSlice';
 function App() {
+
+ const dispatch = useDispatch();
+ 
+  useEffect(() => {
+    // Clean up any existing duplicates when app loads
+    dispatch(mergeDuplicateItems());
+  }, [dispatch]);
+
+ useEffect(() => {
+    // Clean up duplicates when app loads
+    const cartItems = localStorage.getItem('cartItems');
+    if (cartItems) {
+      const parsedItems = JSON.parse(cartItems);
+      const mergedItems = [];
+      
+      parsedItems.forEach(item => {
+        const existingIndex = mergedItems.findIndex(
+          x => x.product === item.product && x.size === item.size && x.color === item.color
+        );
+        if (existingIndex !== -1) {
+          mergedItems[existingIndex].quantity += item.quantity;
+        } else {
+          mergedItems.push({ ...item });
+        }
+      });
+      
+      if (mergedItems.length !== parsedItems.length) {
+        dispatch(setCartItems(mergedItems));
+      }
+    }
+  }, [dispatch]);
+
   return (
     <Provider store={store}>
-      <ThemeProvider theme={sportyUrbanTheme}>
+      <ThemeProvider theme={productsTheme}>
         <CssBaseline />
         <Router>
           <div className="App">

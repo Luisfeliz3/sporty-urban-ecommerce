@@ -79,7 +79,7 @@ const LoginPage = () => {
         </Typography>
 
         <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 3 }}>
-          Welcome back to Urban Athlete
+          Welcome back to EM WHOLESALES
         </Typography>
 
         {error && (

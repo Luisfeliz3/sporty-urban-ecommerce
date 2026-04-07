@@ -108,6 +108,10 @@ const ProductsPage = () => {
     value => value && value !== '' && value !== 'createdAt' && value !== 'desc'
   ).length - 1; // Subtract 1 for page field
 
+
+
+
+  
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       {/* Header */}
@@ -260,6 +264,7 @@ const ProductsPage = () => {
             <FormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel>Color</InputLabel>
               <Select
+                id="select_color"
                 value={localFilters.color}
                 label="Color"
                 onChange={(e) => handleFilterChange('color', e.target.value)}
@@ -304,6 +309,7 @@ const ProductsPage = () => {
             <FormControl fullWidth sx={{ mb: 3 }}>
               <InputLabel>Sort Order</InputLabel>
               <Select
+                id="sort_order"
                 value={localFilters.sortOrder}
                 label="Sort Order"
                 onChange={(e) => handleFilterChange('sortOrder', e.target.value)}
@@ -324,6 +330,7 @@ const ProductsPage = () => {
                 Reset
               </Button>
               <Button
+                id="apply_button"
                 variant="contained"
                 onClick={applyFilters}
                 fullWidth

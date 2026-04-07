@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-
+const Product = require('./Product'); // Add this import
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -206,13 +206,30 @@ userSchema.methods.getDefaultShippingAddress = function() {
 
 // Add these methods to your existing User model:
 
-// Method to get user's cart
+// Method to get user's cart with validation
 userSchema.methods.getCart = function() {
-  return this.cart;
+  return this.cart.filter(item => 
+    item && 
+    item.product && 
+    typeof item.quantity === 'number' && 
+    item.quantity > 0
+  );
 };
+
 
 // Method to add item to cart
 userSchema.methods.addToCart = async function(item) {
+  // Validate input
+  if (!item.product || !item.size || !item.color) {
+    throw new Error('Invalid cart item: missing required fields');
+  }
+  
+  const quantity = Number(item.quantity);
+  if (isNaN(quantity) || quantity < 1) {
+    throw new Error('Invalid quantity');
+  }
+  
+  // Find existing item
   const existingItemIndex = this.cart.findIndex(
     cartItem => 
       cartItem.product.toString() === item.product && 
@@ -222,23 +239,30 @@ userSchema.methods.addToCart = async function(item) {
 
   if (existingItemIndex > -1) {
     // Update quantity if item exists
-    this.cart[existingItemIndex].quantity += item.quantity;
+    const newQuantity = this.cart[existingItemIndex].quantity + quantity;
+    this.cart[existingItemIndex].quantity = newQuantity;
   } else {
     // Add new item to cart
     this.cart.push({
       product: item.product,
-      quantity: item.quantity,
+      quantity: quantity,
       size: item.size,
       color: item.color
     });
   }
 
   await this.save();
-  return this.cart;
+  return this.getCart();
 };
 
 // Method to remove item from cart
 userSchema.methods.removeFromCart = async function(productId, size, color) {
+  if (!productId || !size || !color) {
+    throw new Error('Missing required fields for removal');
+  }
+  
+  const originalLength = this.cart.length;
+  
   this.cart = this.cart.filter(
     item => !(
       item.product.toString() === productId && 
@@ -246,85 +270,169 @@ userSchema.methods.removeFromCart = async function(productId, size, color) {
       item.color === color
     )
   );
-
-  await this.save();
-  return this.cart;
+  
+  // Only save if something was actually removed
+  if (this.cart.length !== originalLength) {
+    await this.save();
+  }
+  
+  return this.getCart();
 };
 
 // Method to update cart item quantity
 userSchema.methods.updateCartItemQuantity = async function(productId, size, color, quantity) {
-  const item = this.cart.find(
+  if (!productId || !size || !color) {
+    throw new Error('Missing required fields for update');
+  }
+  
+  const newQuantity = Number(quantity);
+  if (isNaN(newQuantity) || newQuantity < 0) {
+    throw new Error('Invalid quantity');
+  }
+  
+  const itemIndex = this.cart.findIndex(
     item => 
       item.product.toString() === productId && 
       item.size === size && 
       item.color === color
   );
 
-  if (item) {
-    if (quantity === 0) {
-      return await this.removeFromCart(productId, size, color);
-    } else {
-      item.quantity = quantity;
-      await this.save();
-      return this.cart;
-    }
+  if (itemIndex === -1) {
+    throw new Error('Item not found in cart');
   }
 
-  return this.cart;
+  if (newQuantity === 0) {
+    // Remove item if quantity is 0
+    this.cart.splice(itemIndex, 1);
+  } else {
+    // Update quantity
+    this.cart[itemIndex].quantity = newQuantity;
+  }
+  
+  await this.save();
+  return this.getCart();
 };
+
 
 // Method to clear cart
 userSchema.methods.clearCart = async function() {
   this.cart = [];
   await this.save();
-  return this.cart;
+  return this.getCart();
 };
 
-// Method to sync cart with local storage
+// Method to sync cart with local storage (optimized)
 userSchema.methods.syncCart = async function(localCart) {
   try {
-    // If local cart is empty, return server cart
-    if (!localCart || localCart.length === 0) {
-      return this.cart;
+    // If local cart is empty or invalid, return server cart
+    if (!localCart || !Array.isArray(localCart) || localCart.length === 0) {
+      return this.getCart();
     }
 
-    // Merge server cart with local cart
-    const mergedCart = [...this.cart];
-    
-    localCart.forEach(localItem => {
-      const existingItemIndex = mergedCart.findIndex(
-        serverItem => 
-          serverItem.product.toString() === localItem.product && 
-          serverItem.size === localItem.size && 
-          serverItem.color === localItem.color
-      );
-
-      if (existingItemIndex > -1) {
-        // Use the larger quantity between server and local
-        mergedCart[existingItemIndex].quantity = Math.max(
-          mergedCart[existingItemIndex].quantity,
-          localItem.quantity
-        );
-      } else {
-        // Add local item to merged cart
-        mergedCart.push({
-          product: localItem.product,
-          quantity: localItem.quantity,
-          size: localItem.size,
-          color: localItem.color
-        });
-      }
+    // Create a map of server cart items for quick lookup
+    const serverCartMap = new Map();
+    this.cart.forEach(item => {
+      const key = `${item.product}_${item.size}_${item.color}`;
+      serverCartMap.set(key, item);
     });
 
-    // Update server cart with merged cart
-    this.cart = mergedCart;
-    await this.save();
+    // Merge local cart with server cart
+    const mergedItems = [...this.cart];
+    
+    for (const localItem of localCart) {
+      // Skip invalid local items
+      if (!localItem.product || !localItem.size || !localItem.color || 
+          typeof localItem.quantity !== 'number' || localItem.quantity < 1) {
+        continue;
+      }
+      
+      const key = `${localItem.product}_${localItem.size}_${localItem.color}`;
+      const existingItem = serverCartMap.get(key);
+      
+      // Check product exists and has sufficient inventory
+      const product = await Product.findById(localItem.product);
+      if (!product) continue;
+      
+      if (existingItem) {
+        // Use the larger quantity between server and local, but respect inventory
+        const maxQuantity = Math.max(existingItem.quantity, localItem.quantity);
+        const finalQuantity = Math.min(maxQuantity, product.inventory);
+        
+        if (finalQuantity > 0) {
+          existingItem.quantity = finalQuantity;
+        } else {
+          // Remove item if inventory is 0
+          const index = mergedItems.findIndex(item => 
+            item.product.toString() === localItem.product && 
+            item.size === localItem.size && 
+            item.color === localItem.color
+          );
+          if (index !== -1) mergedItems.splice(index, 1);
+        }
+      } else {
+        // Add local item, respecting inventory limits
+        const finalQuantity = Math.min(localItem.quantity, product.inventory);
+        if (finalQuantity > 0) {
+          mergedItems.push({
+            product: localItem.product,
+            quantity: finalQuantity,
+            size: localItem.size,
+            color: localItem.color
+          });
+        }
+      }
+    }
 
-    return this.cart;
+    // Update server cart with merged items
+    this.cart = mergedItems;
+    await this.save();
+    
+    return this.getCart();
   } catch (error) {
     console.error('Cart sync error:', error);
-    return this.cart;
+    // Return current cart if sync fails
+    return this.getCart();
   }
 };
 
+// Method to get cart item count
+userSchema.methods.getCartItemCount = function() {
+  return this.cart.reduce((total, item) => total + (item.quantity || 0), 0);
+};
+
+// Method to validate cart inventory
+userSchema.methods.validateCartInventory = async function() {
+  const invalidItems = [];
+  
+  for (const item of this.cart) {
+    const product = await Product.findById(item.product);
+    if (!product) {
+      invalidItems.push(item);
+    } else if (product.inventory < item.quantity) {
+      invalidItems.push({
+        ...item.toObject(),
+        available: product.inventory,
+        message: `Only ${product.inventory} items available`
+      });
+    }
+  }
+  
+  return invalidItems;
+};
+
+// Method to cleanup invalid cart items
+userSchema.methods.cleanupInvalidCartItems = async function() {
+  const originalLength = this.cart.length;
+  
+  this.cart = this.cart.filter(async (item) => {
+    const product = await Product.findById(item.product);
+    return product && product.inventory > 0;
+  });
+  
+  if (this.cart.length !== originalLength) {
+    await this.save();
+  }
+  
+  return this.getCart();
+};
 module.exports = mongoose.model('User', userSchema);

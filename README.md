@@ -1,5 +1,5 @@
  
-# 🛒 Sporty Urban E-Commerce App
+# 🛒 EM-WholeSales E-Commerce App
 
 Looking to launch your own e-commerce shop. This Application will do just that! Complete online shopping with cart and checkout functionality. Using Stripe Api to process consumer purchases. This App can be used to sell all types of products. With an admin dashboard to upload new products and price changes on the fly. Configured with a back-end that keeps your products data consistent. With a user friendly UI design.
 
@@ -46,8 +46,8 @@ root/
 ### 1️⃣ Clone the repository
 
 ```bash
-git clone https://github.com/Luisfeliz3/sporty-urban-ecommerce.git
-cd sporty-urban-ecommerce
+git clone https://github.com/Luisfeliz3/em-wholesales.git
+cd em-wholesales
 
 ### 2️⃣ Install dependencies (Frontend + Backend)
 

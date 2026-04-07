@@ -104,13 +104,13 @@ const Header = () => {
               fontWeight: 700,
             }}
           >
-            URBAN ATHLETE
+            EM WHOLESALES
           </Typography>
  
 <Button color="inherit" component={Link} to="/products">
   Shop All
 </Button>
-          <SearchContainer>
+          {/* <SearchContainer>
             <SearchIconWrapper>
               <Search />
             </SearchIconWrapper>
@@ -118,7 +118,7 @@ const Header = () => {
               placeholder="Search products..."
               inputProps={{ "aria-label": "search" }}
             />
-          </SearchContainer>
+          </SearchContainer> */}
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <IconButton color="inherit" component={Link} to="/cart">

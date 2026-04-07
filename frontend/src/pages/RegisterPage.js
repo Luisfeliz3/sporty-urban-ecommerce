@@ -70,7 +70,7 @@ const RegisterPage = () => {
         </Typography>
 
         <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 3 }}>
-          Join Urban Athlete today
+          Join EM today
         </Typography>
 
         {error && (

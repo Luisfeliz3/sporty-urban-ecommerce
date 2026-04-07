@@ -1,6 +1,6 @@
 import { createTheme } from '@mui/material/styles';
 
-export const sportyUrbanTheme = createTheme({
+export const productsTheme = createTheme({
   palette: {
     primary: {
       main: '#FF6B35', // Energetic Orange

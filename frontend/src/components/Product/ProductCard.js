@@ -20,15 +20,21 @@ const ProductCard = ({ product }) => {
   const dispatch = useDispatch();
 
   const handleAddToCart = () => {
-    dispatch(addToCartLocal({
-      product: product._id,
-      name: product.name,
-      price: product.price,
-      image: product.images[0] ,
-      size: product.sizes[0],
-      color: product.colors[0],
-      quantity: 1,
-    }));
+   // Make sure we have valid size and color
+  const defaultSize = product.sizes && product.sizes.length > 0 ? product.sizes[0] : 'M';
+  const defaultColor = product.colors && product.colors.length > 0 ? product.colors[0] : 'Black';
+  
+  dispatch(addToCartLocal({
+    
+    product: product._id,  // This should match what backend expects
+    name: product.name,
+    price: product.price,
+    image: product.images[0]?.url || product.images[0] || defaultTshirt,
+    size: defaultSize,
+    color: defaultColor,
+    quantity: 1,
+  }));
+
   };
 
   return (

@@ -71,7 +71,7 @@ router.post('/create-payment-intent', auth, async (req, res) => {
         userId: order.user._id.toString()
       },
       setup_future_usage: savePaymentMethod ? 'on_session' : undefined,
-      description: `Order #${order._id} - Urban Athlete`,
+      description: `Order #${order._id} - EM`,
       shipping: {
         name: order.user.name,
         address: {

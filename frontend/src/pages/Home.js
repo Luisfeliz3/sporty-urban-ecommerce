@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProducts } from '../store/slices/productSlice';
 import ProductGrid from '../components/Product/ProductGrid';
-import mainTshirtPic from "../images/urbanmaintshirt.png"
+import EM_MAIN_LOGO from "../images/EM_MAIN_LOGO.png"
 
 
 const HomePage = () => {
@@ -43,17 +43,18 @@ const HomePage = () => {
                 gutterBottom
                 sx={{ fontWeight: 700 }}
               >
-                URBAN ATHLETE GEAR
+                EM WHOLESALES
               </Typography>
               <Typography variant="h5" gutterBottom sx={{ mb: 3, opacity: 0.9 }}>
                 Performance Meets Street Style
               </Typography>
               <Typography variant="body1" sx={{ mb: 4, opacity: 0.8 }}>
-                Discover our collection of high-performance athletic wear designed 
-                for the urban athlete. From the court to the streets, we've got you covered.
+                Discover our wholesale selection of detergents, home care products, toiletries, and food. 
+                From Super Markets, Pharmacy, Bodegas we’ve got you covered.
               </Typography>
               <Button
                 variant="contained"
+                id="shop_collection_button"
                 size="large"
                 component={Link}
                 to="/products"
@@ -65,13 +66,13 @@ const HomePage = () => {
                   },
                 }}
               >
-                Shop Collection
+                Shop All Products
               </Button>
             </Grid>
             <Grid item xs={12} md={6}>
               <Box
                 component="img"
-                src={mainTshirtPic}
+                src={EM_MAIN_LOGO}
                 alt="Urban Athletic"
                 sx={{
                   width: '100%',
