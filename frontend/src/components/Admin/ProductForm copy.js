@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { Delete, Add, CloudUpload } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { createProduct, updateProduct, uploadMultipleProductImages } from '../../store/slices/adminSlice';
+import { createProduct, updateProduct } from '../../store/slices/adminSlice';
 
 const categories = ['T-Shirts', 'Jerseys', 'Shorts', 'Hoodies', 'Jackets', 'Accessories'];
 const sportTypes = ['basketball', 'soccer', 'running', 'training', 'lifestyle', 'skateboarding', 'yoga', 'football', 'baseball'];
@@ -42,8 +42,6 @@ const defaultColors = [
 const ProductForm = ({ open, onClose, onSuccess, product }) => {
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.admin);
-  
-  const [uploadingImages, setUploadingImages] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -60,8 +58,7 @@ const ProductForm = ({ open, onClose, onSuccess, product }) => {
     tags: [],
   });
 
-  const [images, setImages] = useState([]); // Store uploaded image URLs
-  const [imageFiles, setImageFiles] = useState([]); // Store selected files for upload
+  const [images, setImages] = useState([]);
   const [newTag, setNewTag] = useState('');
   const [newColor, setNewColor] = useState({ name: '', code: '#000000' });
 
@@ -82,9 +79,7 @@ const ProductForm = ({ open, onClose, onSuccess, product }) => {
         sportType: product.sportType || 'lifestyle',
         tags: product.tags || [],
       });
-      // Set existing images from product
-      setImages(product.images || []);
-      setImageFiles([]);
+      // Note: Images are handled separately since they're files
     } else if (open) {
       // Reset form for new product
       setFormData({
@@ -102,7 +97,6 @@ const ProductForm = ({ open, onClose, onSuccess, product }) => {
         tags: [],
       });
       setImages([]);
-      setImageFiles([]);
     }
   }, [product, open]);
 
@@ -114,36 +108,13 @@ const ProductForm = ({ open, onClose, onSuccess, product }) => {
     }));
   };
 
-// Replace the handleImageChange function in ProductForm.js with this:
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    setImages(prev => [...prev, ...files]);
+  };
 
-const handleImageChange = async (e) => {
-  const files = Array.from(e.target.files);
-  if (files.length === 0) return;
-  
-  setUploadingImages(true);
-  
-  try {
-    console.log('Selected files:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
-    
-    // Upload images to GCS
-    const uploadedImages = await dispatch(uploadMultipleProductImages(files)).unwrap();
-    
-    console.log('Upload successful:', uploadedImages);
-    setImages(prev => [...prev, ...uploadedImages]);
-    alert(`${uploadedImages.length} image(s) uploaded successfully!`);
-  } catch (error) {
-    console.error('Detailed upload error:', error);
-    // Show more detailed error message
-    const errorMsg = typeof error === 'string' ? error : (error.message || 'Please try again');
-    alert(`Failed to upload images: ${errorMsg}`);
-  } finally {
-    setUploadingImages(false);
-    e.target.value = '';
-  }
-};
-
-  const removeImage = (indexToRemove) => {
-    setImages(prev => prev.filter((_, index) => index !== indexToRemove));
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const addTag = () => {
@@ -189,7 +160,7 @@ const handleImageChange = async (e) => {
         price: parseFloat(formData.price),
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : '',
         inventory: parseInt(formData.inventory),
-        images: images // This now contains the GCS URLs
+        images: images
       };
 
       if (product) {
@@ -218,15 +189,6 @@ const handleImageChange = async (e) => {
       e.preventDefault();
       addColor();
     }
-  };
-
-  // Function to set primary image
-  const setPrimaryImage = (index) => {
-    const newImages = [...images];
-    newImages.forEach((img, i) => {
-      img.isPrimary = i === index;
-    });
-    setImages(newImages);
   };
 
   return (
@@ -480,11 +442,10 @@ const handleImageChange = async (e) => {
               <Button
                 variant="outlined"
                 component="label"
-                startIcon={uploadingImages ? <CircularProgress size={20} /> : <CloudUpload />}
-                disabled={uploadingImages}
+                startIcon={<CloudUpload />}
                 sx={{ mb: 2 }}
               >
-                {uploadingImages ? 'Uploading...' : 'Upload Images'}
+                Upload Images
                 <input
                   type="file"
                   multiple
@@ -495,24 +456,17 @@ const handleImageChange = async (e) => {
               </Button>
 
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {images.length} image(s). Click on an image to set as primary.
+                Selected {images.length} image(s). First image will be set as primary.
               </Typography>
 
               <Grid container spacing={2}>
                 {images.map((image, index) => (
                   <Grid item xs={6} md={3} key={index}>
-                    <Card 
-                      sx={{ 
-                        cursor: 'pointer',
-                        border: image.isPrimary ? '2px solid #1976d2' : 'none',
-                        position: 'relative'
-                      }}
-                      onClick={() => setPrimaryImage(index)}
-                    >
+                    <Card>
                       <CardContent sx={{ textAlign: 'center', p: 1 }}>
                         <img
-                          src={image.url}
-                          alt={`Product ${index + 1}`}
+                          src={URL.createObjectURL(image)}
+                          alt={`Preview ${index + 1}`}
                           style={{
                             width: '100%',
                             height: 100,
@@ -520,20 +474,12 @@ const handleImageChange = async (e) => {
                             borderRadius: 4
                           }}
                         />
-                        {image.isPrimary && (
-                          <Typography variant="caption" color="primary" sx={{ mt: 0.5, display: 'block' }}>
-                            Primary
-                          </Typography>
-                        )}
-                        <Typography variant="body2" noWrap sx={{ mt: 1, fontSize: '0.7rem' }}>
-                          {image.filename?.split('/').pop() || `Image ${index + 1}`}
+                        <Typography variant="body2" noWrap sx={{ mt: 1 }}>
+                          {image.name}
                         </Typography>
                         <IconButton
                           size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeImage(index);
-                          }}
+                          onClick={() => removeImage(index)}
                           color="error"
                           sx={{ mt: 0.5 }}
                         >
@@ -549,13 +495,13 @@ const handleImageChange = async (e) => {
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={onClose} disabled={loading || uploadingImages}>
+          <Button onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           <Button 
             type="submit" 
             variant="contained" 
-            disabled={loading || uploadingImages || images.length === 0}
+            disabled={loading}
             startIcon={loading ? <CircularProgress size={20} /> : null}
           >
             {loading ? 'Saving...' : product ? 'Update Product' : 'Create Product'}

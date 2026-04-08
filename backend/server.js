@@ -21,7 +21,9 @@ connectDB();
 const corsOptions = {
   origin: [
     'http://localhost:3000/api',
-    'https://sporty-urban-ecommerce.onrender.com', // Your frontend Render URL
+     'http://localhost:3001',
+    'https://sporty-urban-ecommerce.onrender.com',
+     // Your frontend Render URL
     process.env.CLIENT_URL
   ].filter(Boolean),
   credentials: true,
@@ -60,6 +62,8 @@ const profileRoutes = require('./routes/profile');
 const cartRoutes = require('./routes/cart');
 const adminProductRoutes = require('./routes/admin/products');
 const stripeRoutes = require('./routes/stripe');
+// Add this with your other route imports
+const uploadRoutes = require('./routes/admin/upload');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -70,6 +74,10 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/admin/products', adminProductRoutes);
 app.use('/api/stripe', stripeRoutes);
+
+// Add this with your other route declarations
+app.use('/api/admin/upload', uploadRoutes);
+
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -113,6 +121,15 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Add this to your server.js temporarily
+app.get('/api/test-upload', (req, res) => {
+  res.json({ message: 'GCS setup ready! Check your environment variables.' });
+});
+
+// Log GCS config on server start
+console.log('GCS Bucket:', process.env.GCS_BUCKET_NAME);
+console.log('GCS Key File:', process.env.GOOGLE_CLOUD_KEY_FILE);
 
 
 app.listen(PORT, () => {

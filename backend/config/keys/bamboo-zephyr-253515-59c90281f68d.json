@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "bamboo-zephyr-253515",
+  "private_key_id": "59c90281f68d86d560437b84e5602a202100a542",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDtOxnvBZI2WGGN\naHqdBuzpmXMuKEOGTLjKgIFdPApNKJPV2VxPTHnWWx6KLXQjvFOCAuImJbPAyJ6s\n0Ssp1fk6usjH6jRE+RXHF7/gd5YaeWpS/2E1U/qROTIhB0tNW0S9W3Oo0rXSRmpv\nQn7sbh6l4cNyvXLaLK7HIU/9dpz1pIzQywK+NCotIrNRCKzEzSLz8n9z0odPH0C/\nfaj/WxpF4Q1oFrfOZiYubcm/SjKbSFZvJfmeL5PSD/QXJIvKoSZrXk9jCmMe40gZ\n1FL++kocmurNvE8BKpp7Mf24YqWZEXoyi9O00pcJo2MAhtC5TP0Pt0ttGTwT7Aut\nL2VuQ22lAgMBAAECggEAJ0qHIJH9JfgcbCXWTQS1H3mVXJs5l9hEMPH4ux7zG9Vx\nKtWd1tp1QX4FAGDH4BVUhW+B0kyjSXZQ5ZGdQwgYB9Sg5Y+SSawxobB6zKwx1b+v\nTwDSMllu4jelaFgDblQD/hLUBK2lhKa6ASRzzifs9o9+ZhYfnCgTaJLJY1MOaxac\nw/wNEd5PDK+jHELe9XPe/Y6eakOJY4oZpl9zVnIhJUiB7RhSxuB3W3ihWadFQtNv\nXCakHWq0EDeNQqLvW1TXJ837BafCuROg/r5eEh5F6zKK4X4/qv6rm1f+k8OFwIZC\nN44rl/giLGZhmYWnfNJjtvV/V25TxhJhKyv2hEY8TwKBgQD2nSwUM7iOMQUE6SXt\naI8Z6hEd+GFvV2LceCu7Hxn7VyOIRBdZ2DZ5YBeqOFcHPy4QC74TEQEdyje8HkkU\nW7uSWOzE5A0jgis/jv5NE/cXlCN+gasoGybp513DhWpMqZ9eTSjWO6vXjUJrs6WY\nm1GUiIpsycmJYTLH8dcoznmdawKBgQD2QoHQskjtgWN8JjPrui8kllMbWBbm9PoM\npntczxvs9WxHFj3koCG7H5YBqYiyxNx3hmTK/c17NZifgSMFy768F4LSJKQ1FeB9\nv9uO3+hkfHN1fowGPWA70jVHuwokRQXEWqP/cHR91ktKrKm5Zaut7fbRerfU1uAa\nVuf7JcFVLwKBgQCBXQ0kQ8VKAXjKjKqykKiQRXJZMFOcHlDjqb322Ge+qoUfE+jT\n3lEk9j0zs34jdQbqr94zDjZxtAPskE5xeXU5XaBF4ALsX3nkS1QmhpSVL8Y2tDpe\nPW/6Pr22tKOAN3I7+2myh3arCZSP/pqdJMx0h/NlAazQfcYvkDL3Wuf8pQKBgQDt\nqo5C7m332pI7NVuSu6PX+cTHdSLVT8UsBFi236Oh89LGYK7nQayMPhW2EPq/HcNx\nD6GjT4PKz5U3C5jTdSnlugMl8PsRyMVaV5n8sBhHMtzznmhhdUa1NVD6o4dMLdk9\nAgWY991VvUX5Ed7T8U3ZlPpKfdeBcMfkY8+L0YpfPQKBgQCkjFDQhukhZ8kBzn+U\nhsyOFG3wOilIgT+lO5dVxdVfxt0s4j8ZyDebaRsQGFUZpGz9sRAY5R70Gsmg7pnb\nmwU5RNHzEmQVDNo1crHmGOsly5x3NtWBp6KaTTWaDYNZHMewuJY2ylUezfGGRBAA\n1qRx4pt1viqdDnKt4DxNVdZ07Q==\n-----END PRIVATE KEY-----\n",
+  "client_email": "product-image-uploader@bamboo-zephyr-253515.iam.gserviceaccount.com",
+  "client_id": "107449989039325811311",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/product-image-uploader%40bamboo-zephyr-253515.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

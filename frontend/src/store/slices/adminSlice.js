@@ -1,5 +1,10 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import axios from 'axios';
 import API from '../../utils/api';
+import axiosInstance from '../axiosConfig';
+
+
+
 
 // Get all products (admin)
 export const getAdminProducts = createAsyncThunk(
@@ -14,58 +19,163 @@ export const getAdminProducts = createAsyncThunk(
   }
 );
 
-// Create product
+// Helper function to get auth token from various possible locations
+const getAuthToken = () => {
+  // Try different possible storage keys
+  const token = localStorage.getItem('token') || 
+                localStorage.getItem('userToken') || 
+                localStorage.getItem('authToken');
+  
+  // Also check if token is inside userInfo object
+  if (!token) {
+    const userInfo = localStorage.getItem('userInfo');
+    if (userInfo) {
+      try {
+        const user = JSON.parse(userInfo);
+        return user.token || user.accessToken;
+      } catch (e) {
+        console.error('Error parsing userInfo:', e);
+      }
+    }
+  }
+  
+  return token;
+};
+
+// Add this new async thunk
+export const uploadProductImage = createAsyncThunk(
+  'admin/uploadProductImage',
+  async (file, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`,
+        },
+      };
+      
+      const { data } = await axios.post('/api/admin/upload/image', formData, config);
+      return data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
+// Update the upload function
+export const uploadMultipleProductImages = createAsyncThunk(
+  'admin/uploadMultipleProductImages',
+  async (files, { rejectWithValue }) => {
+    try {
+      console.log('Uploading files:', files.length);
+      
+      const formData = new FormData();
+      files.forEach((file, index) => {
+        console.log(`Appending file ${index + 1}:`, file.name, file.size, file.type);
+        formData.append('images', file);
+      });
+      
+      // Get token using our helper function
+      const token = getAuthToken();
+      console.log('Token found:', token ? 'YES' : 'NO');
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+      
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`,
+        },
+      };
+      
+      console.log('Sending upload request to:', '/api/admin/upload/images');
+      const { data } = await axiosInstance.post('/admin/upload/images', formData, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+    // No need to manually add Authorization header - interceptor adds it
+  },
+});
+      console.log('Upload response:', data);
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Upload failed');
+      }
+      
+      return data.data;
+    } catch (error) {
+      console.error('Upload error details:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      let errorMessage = 'Failed to upload images';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+// Also update your createProduct and updateProduct functions similarly
 export const createProduct = createAsyncThunk(
   'admin/createProduct',
   async (productData, { rejectWithValue }) => {
     try {
-      // Handle FormData for file uploads
-      const formData = new FormData();
+      const token = getAuthToken(); // Use the same helper
       
-      // Append product fields
-      Object.keys(productData).forEach(key => {
-        if (key === 'images') {
-          // Append each image file
-          productData.images.forEach((image, index) => {
-            formData.append('images', image);
-          });
-        } else if (Array.isArray(productData[key])) {
-          // Convert arrays to strings
-          formData.append(key, productData[key].join(','));
-        } else {
-          formData.append(key, productData[key]);
-        }
-      });
-
-      const { data } = await API.post('/admin/products', formData, {
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      const config = {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-      });
-      return data;
+      };
+      
+      const { data } = await axios.post('/api/admin/products', productData, config);
+      return data.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create product');
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
-// Update product
-// Update product
 export const updateProduct = createAsyncThunk(
   'admin/updateProduct',
   async ({ id, productData }, { rejectWithValue }) => {
     try {
-      const { data } = await API.put(`/admin/products/${id}`, productData, {
+      const token = getAuthToken(); // Use the same helper
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      const config = {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-      });
-      return data;
+      };
+      
+      const { data } = await axios.put(`/api/admin/products/${id}`, productData, config);
+      return data.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update product');
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
+
 
 // Delete product
 export const deleteProduct = createAsyncThunk(

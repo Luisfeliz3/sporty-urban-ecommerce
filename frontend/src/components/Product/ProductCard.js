@@ -40,9 +40,9 @@ const ProductCard = ({ product }) => {
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardMedia
-        component="img"
+        component="img"  
         height="290"
-        image={product.images[0].url || defaultTshirt}
+       image={product.images[0]?.url || product.images[0] || defaultTshirt}
         alt={product.name}
         sx={{ objectFit: 'cover' }}
       />

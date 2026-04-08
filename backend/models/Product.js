@@ -31,18 +31,21 @@ const productSchema = new mongoose.Schema({
     trim: true
   },
   images: [{
-    data: Buffer,
+    url: {
+      type: String,
+      required: true
+    },
+    filename: {
+      type: String, // Store GCS filename for deletion
+      required: true
+    },
     contentType: String,
-    filename: String,
-    
     isPrimary: {
       type: Boolean,
       default: false
     },
-    url : String,
     alt: String,
     size: Number,
-    
     uploadedAt: {
       type: Date,
       default: Date.now
