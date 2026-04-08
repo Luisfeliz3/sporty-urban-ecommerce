@@ -31,4 +31,4 @@ yarn-error.log*
 /backend/.env
 /frontend/.env
 
- /backend/config/keys/*.json
+ ./backend/config/keys/*.json
