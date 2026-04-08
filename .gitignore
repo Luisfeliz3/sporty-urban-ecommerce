@@ -31,4 +31,4 @@ yarn-error.log*
 /backend/.env
 /frontend/.env
 
- /backend/config/keys/bamboo-zephyr-253515-59c90281f68d.json
+backend/config/keys/bamboo-zephyr-253515-59c90281f68d.json
