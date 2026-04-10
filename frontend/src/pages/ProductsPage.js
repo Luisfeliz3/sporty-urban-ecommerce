@@ -120,7 +120,7 @@ const ProductsPage = () => {
           Shop All Products
         </Typography>
         <Typography variant="h6" color="text.secondary">
-          Discover our complete collection of sportswear and accessories
+          Discover our complete collection of Detergents and other cleaning agents and home care products.
         </Typography>
       </Box>
 

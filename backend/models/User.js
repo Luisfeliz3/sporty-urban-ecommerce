@@ -217,108 +217,146 @@ userSchema.methods.getCart = function() {
 };
 
 
-// Method to add item to cart
+// Update other cart methods similarly
 userSchema.methods.addToCart = async function(item) {
-  // Validate input
-  if (!item.product || !item.size || !item.color) {
-    throw new Error('Invalid cart item: missing required fields');
-  }
-  
-  const quantity = Number(item.quantity);
-  if (isNaN(quantity) || quantity < 1) {
-    throw new Error('Invalid quantity');
-  }
-  
-  // Find existing item
-  const existingItemIndex = this.cart.findIndex(
-    cartItem => 
-      cartItem.product.toString() === item.product && 
-      cartItem.size === item.size && 
-      cartItem.color === item.color
-  );
+  try {
+    // Validate input
+    if (!item.product || !item.size || !item.color) {
+      throw new Error('Invalid cart item: missing required fields');
+    }
+    
+    const quantity = Number(item.quantity);
+    if (isNaN(quantity) || quantity < 1) {
+      throw new Error('Invalid quantity');
+    }
+    
+    // Find existing item
+    const existingItemIndex = this.cart.findIndex(
+      cartItem => 
+        cartItem.product.toString() === item.product && 
+        cartItem.size === item.size && 
+        cartItem.color === item.color
+    );
 
-  if (existingItemIndex > -1) {
-    // Update quantity if item exists
-    const newQuantity = this.cart[existingItemIndex].quantity + quantity;
-    this.cart[existingItemIndex].quantity = newQuantity;
-  } else {
-    // Add new item to cart
-    this.cart.push({
-      product: item.product,
-      quantity: quantity,
-      size: item.size,
-      color: item.color
-    });
-  }
+    if (existingItemIndex > -1) {
+      // Update quantity if item exists
+      const newQuantity = this.cart[existingItemIndex].quantity + quantity;
+      this.cart[existingItemIndex].quantity = newQuantity;
+    } else {
+      // Add new item to cart
+      this.cart.push({
+        product: item.product,
+        quantity: quantity,
+        size: item.size,
+        color: item.color
+      });
+    }
 
-  await this.save();
-  return this.getCart();
+    // Use findOneAndUpdate to bypass version checking
+    await this.constructor.findOneAndUpdate(
+      { _id: this._id },
+      { $set: { cart: this.cart } },
+      { versionKey: false }
+    );
+    
+    return this.getCart();
+  } catch (error) {
+    console.error('Add to cart error:', error);
+    throw error;
+  }
 };
 
-// Method to remove item from cart
+
 userSchema.methods.removeFromCart = async function(productId, size, color) {
-  if (!productId || !size || !color) {
-    throw new Error('Missing required fields for removal');
+  try {
+    if (!productId || !size || !color) {
+      throw new Error('Missing required fields for removal');
+    }
+    
+    const originalLength = this.cart.length;
+    
+    this.cart = this.cart.filter(
+      item => !(
+        item.product.toString() === productId && 
+        item.size === size && 
+        item.color === color
+      )
+    );
+    
+    // Only save if something was actually removed
+    if (this.cart.length !== originalLength) {
+      await this.constructor.findOneAndUpdate(
+        { _id: this._id },
+        { $set: { cart: this.cart } },
+        { versionKey: false }
+      );
+    }
+    
+    return this.getCart();
+  } catch (error) {
+    console.error('Remove from cart error:', error);
+    throw error;
   }
-  
-  const originalLength = this.cart.length;
-  
-  this.cart = this.cart.filter(
-    item => !(
-      item.product.toString() === productId && 
-      item.size === size && 
-      item.color === color
-    )
-  );
-  
-  // Only save if something was actually removed
-  if (this.cart.length !== originalLength) {
-    await this.save();
-  }
-  
-  return this.getCart();
 };
 
-// Method to update cart item quantity
 userSchema.methods.updateCartItemQuantity = async function(productId, size, color, quantity) {
-  if (!productId || !size || !color) {
-    throw new Error('Missing required fields for update');
-  }
-  
-  const newQuantity = Number(quantity);
-  if (isNaN(newQuantity) || newQuantity < 0) {
-    throw new Error('Invalid quantity');
-  }
-  
-  const itemIndex = this.cart.findIndex(
-    item => 
-      item.product.toString() === productId && 
-      item.size === size && 
-      item.color === color
-  );
+  try {
+    if (!productId || !size || !color) {
+      throw new Error('Missing required fields for update');
+    }
+    
+    const newQuantity = Number(quantity);
+    if (isNaN(newQuantity) || newQuantity < 0) {
+      throw new Error('Invalid quantity');
+    }
+    
+    const itemIndex = this.cart.findIndex(
+      item => 
+        item.product.toString() === productId && 
+        item.size === size && 
+        item.color === color
+    );
 
-  if (itemIndex === -1) {
-    throw new Error('Item not found in cart');
-  }
+    if (itemIndex === -1) {
+      throw new Error('Item not found in cart');
+    }
 
-  if (newQuantity === 0) {
-    // Remove item if quantity is 0
-    this.cart.splice(itemIndex, 1);
-  } else {
-    // Update quantity
-    this.cart[itemIndex].quantity = newQuantity;
+    if (newQuantity === 0) {
+      // Remove item if quantity is 0
+      this.cart.splice(itemIndex, 1);
+    } else {
+      // Update quantity
+      this.cart[itemIndex].quantity = newQuantity;
+    }
+    
+    await this.constructor.findOneAndUpdate(
+      { _id: this._id },
+      { $set: { cart: this.cart } },
+      { versionKey: false }
+    );
+    
+    return this.getCart();
+  } catch (error) {
+    console.error('Update cart quantity error:', error);
+    throw error;
   }
-  
-  await this.save();
-  return this.getCart();
 };
 
 
 // Method to clear cart
 userSchema.methods.clearCart = async function() {
-  this.cart = [];
-  await this.save();
-  return this.getCart();
+  try {
+    this.cart = [];
+    await this.constructor.findOneAndUpdate(
+      { _id: this._id },
+      { $set: { cart: [] } },
+      { versionKey: false }
+    );
+    return this.getCart();
+  } catch (error) {
+    console.error('Clear cart error:', error);
+    throw error;
+  }
 };
 
 // Method to sync cart with local storage (optimized)
@@ -385,7 +423,17 @@ userSchema.methods.syncCart = async function(localCart) {
 
     // Update server cart with merged items
     this.cart = mergedItems;
-    await this.save();
+    
+    // Use findOneAndUpdate to bypass version checking
+    await this.constructor.findOneAndUpdate(
+      { _id: this._id },
+      { $set: { cart: mergedItems } },
+      { new: true, runValidators: true, versionKey: false } // versionKey: false disables version checking
+    );
+    
+    // Refresh the current document
+    const updatedUser = await this.constructor.findById(this._id);
+    this.cart = updatedUser.cart;
     
     return this.getCart();
   } catch (error) {

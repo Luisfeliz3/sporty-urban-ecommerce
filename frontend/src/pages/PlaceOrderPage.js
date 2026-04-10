@@ -19,9 +19,9 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { createOrder } from '../store/slices/orderSlice';
 import { createPaymentIntent } from '../store/slices/stripeSlice';
-import { clearCart, clearCartLocal } from '../store/slices/cartSlice';
+import { clearCartLocal } from '../store/slices/cartSlice';
 import StripePayment from '../components/Payments/StripePayment';
-import defaultTshirt from "../components/Product/defaultTshirt.png"
+import defaultTshirt from "../components/Product/defaultTshirt.png";
 
 const steps = ['Shipping', 'Payment', 'Place Order'];
 
@@ -44,58 +44,90 @@ const PlaceOrderPage = () => {
   const shippingPrice = itemsPrice > 50 ? 0 : 10;
   const totalPrice = itemsPrice + taxPrice + shippingPrice;
 
+// In PlaceOrderPage.js, update the placeOrderHandler
+const placeOrderHandler = async () => {
+  if (!userInfo) {
+    navigate('/login?redirect=placeorder');
+    return;
+  }
 
-  const placeOrderHandler = async () => {
-    if (!userInfo) {
-      navigate('/login?redirect=placeorder');
-      return;
-    }
+  if (cartItems.length === 0) {
+    setLocalError('Your cart is empty');
+    navigate('/cart');
+    return;
+  }
 
+  if (!shippingAddress?.street) {
+    setLocalError('Please complete shipping information');
+    navigate('/shipping');
+    return;
+  }
 
-const orderData = {
-      orderItems: cartItems.map(item => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        size: item.size,
-        color: item.color,
-        image: item.image,
-        product: item.product,
-      })),
-      shippingAddress,
-      paymentMethod,
-      itemsPrice,
-      taxPrice,
-      shippingPrice,
-      totalPrice,
-    };
+  if (!paymentMethod) {
+    setLocalError('Please select a payment method');
+    navigate('/payment');
+    return;
+  }
 
-    try {
-      // Create order first
-      const result = await dispatch(createOrder(orderData)).unwrap();
-      setCreatedOrder(result);
-
-      if (paymentMethod === 'Credit Card') {
-        // Show Stripe payment for credit card payments
-        setShowStripePayment(true);
-        
-        // Create payment intent
-        await dispatch(createPaymentIntent({
-          orderId: result._id,
-          savePaymentMethod: false // You can make this configurable
-        })).unwrap();
-      } else {
-        // For other payment methods, just clear cart and redirect
-        dispatch(clearCartLocal());
-        navigate(`/order/${result._id}`);
-      }
-    } catch (error) {
-      console.error('Order creation error:', error);
-    }
+  setLocalError('');
+  
+  const orderData = {
+    orderItems: cartItems.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      size: item.size,
+      color: item.color,
+      image: item.image,
+      product: item.product,
+    })),
+    shippingAddress,
+    paymentMethod,
+    itemsPrice,
+    taxPrice,
+    shippingPrice,
+    totalPrice,
   };
 
+  try {
+    // Create order first
+    const result = await dispatch(createOrder(orderData)).unwrap();
+    
+    // The result should contain the order object
+    // Based on your API, it might be result.data or just result
+    const newOrder = result.data || result;
+    setCreatedOrder(newOrder);
+    
+    // Check payment method and handle accordingly
+    if (paymentMethod === 'Credit Card' || paymentMethod === 'Apple Pay' || paymentMethod === 'Google Pay') {
+      // Create payment intent for Stripe
+      await dispatch(createPaymentIntent({
+        orderId: newOrder._id,
+        savePaymentMethod: false
+      })).unwrap();
+      
+      // Show Stripe payment modal
+      setShowStripePayment(true);
+    } else {
+      // For other payment methods (like Cash on Delivery, Bank Transfer, etc.)
+      dispatch(clearCartLocal());
+      navigate(`/order/${newOrder._id}`);
+    }
+  } catch (error) {
+    console.error('Order creation error:', error);
+    setLocalError(error.message || 'Failed to create order. Please try again.');
+  }
+};
 
+// Update the useEffect that handles successful order creation
+useEffect(() => {
+  if (success && order && !showStripePayment && paymentMethod !== 'Credit Card') {
+    dispatch(clearCartLocal());
+    navigate(`/order/${order._id}`);
+  }
+}, [success, order, showStripePayment, paymentMethod, navigate, dispatch]);
 
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!userInfo) {
       navigate('/login?redirect=placeorder');
@@ -118,93 +150,30 @@ const orderData = {
     }
   }, [userInfo, cartItems, shippingAddress, paymentMethod, navigate]);
 
+  // Handle successful order creation for non-Stripe payments
   useEffect(() => {
-    if (success && order && !showStripePayment) {
-      // For non-credit card payments, redirect immediately
-      if (paymentMethod !== 'Credit Card') {
-        dispatch(clearCartLocal());
-        navigate(`/order/${order._id}`);
-      }
+    if (success && order && !showStripePayment && paymentMethod !== 'Credit Card') {
+      dispatch(clearCartLocal());
+      navigate(`/order/${order._id}`);
     }
   }, [success, order, showStripePayment, paymentMethod, navigate, dispatch]);
 
-  // const placeOrderHandler = async () => {
-  //   try {
-  //     setLocalError('');
+// In PlaceOrderPage.js, update the handlePaymentSuccess function
+const handlePaymentSuccess = (paidOrder) => {
+  console.log('✅ Payment successful for order:', paidOrder._id);
+  setShowStripePayment(false);
+  dispatch(clearCartLocal());
+  // Clear cart from localStorage as well
+  localStorage.removeItem('cart');
+  // Navigate to order confirmation page
+  navigate(`/order/${paidOrder._id}`);
+};
 
-  //     // Validation
-  //     if (!shippingAddress || !shippingAddress.street) {
-  //       setLocalError('Please complete shipping information');
-  //       navigate('/shipping');
-  //       return;
-  //     }
-
-  //     if (!paymentMethod) {
-  //       setLocalError('Please select a payment method');
-  //       navigate('/payment');
-  //       return;
-  //     }
-
-  //     if (cartItems.length === 0) {
-  //       setLocalError('Your cart is empty');
-  //       navigate('/cart');
-  //       return;
-  //     }
-
-  //     const orderData = {
-  //       orderItems: cartItems.map(item => ({
-  //         name: item.name,
-  //         quantity: item.quantity,
-  //         price: item.price,
-  //         size: item.size,
-  //         color: item.color,
-  //         image: item.image,
-  //         product: item.product,
-  //       })),
-  //       shippingAddress,
-  //       paymentMethod,
-  //       itemsPrice,
-  //       taxPrice,
-  //       shippingPrice,
-  //       totalPrice,
-  //     };
-
-  //     console.log('📦 Creating order with data:', orderData);
-
-  //     // Create order first
-  //     const result = await dispatch(createOrder(orderData)).unwrap();
-  //     setCreatedOrder(result);
-
-  //     if (paymentMethod === 'Credit Card') {
-  //       // Show Stripe payment for credit card payments
-  //       setShowStripePayment(true);
-        
-  //       // Create payment intent
-  //       await dispatch(createPaymentIntent({
-  //         orderId: result._id,
-  //         savePaymentMethod: false
-  //       })).unwrap();
-  //     } else {
-  //       // For other payment methods, just clear cart and redirect
-  //       dispatch(clearCartLocal());
-  //       navigate(`/order/${result._id}`);
-  //     }
-  //   } catch (error) {
-  //     console.error('Order creation error:', error);
-  //     setLocalError(error || 'Failed to create order. Please try again.');
-  //   }
-  // };
-
-  const handlePaymentSuccess = (order) => {
-    console.log('✅ Payment successful for order:', order._id);
-    setShowStripePayment(false);
-    dispatch(clearCartLocal());
-    navigate(`/order/${order._id}`);
-  };
 
   const handlePaymentClose = () => {
     setShowStripePayment(false);
-    // Optionally: cancel the order if payment is cancelled
+    // Optionally: you might want to delete the order if payment is cancelled
+    // or just let the user try again with the same order
   };
 
   if (cartItems.length === 0) {
@@ -303,7 +272,7 @@ const orderData = {
                 <Box key={`${item.product}-${item.size}-${item.color}`}>
                   <Box sx={{ display: 'flex', alignItems: 'center', py: 2 }}>
                     <img
-                      src={item.image}
+                      src={item.image || defaultTshirt}
                       alt={item.name}
                       style={{
                         width: 60,
@@ -313,7 +282,7 @@ const orderData = {
                         marginRight: 16,
                       }}
                       onError={(e) => {
-                        e.target.src = {defaultTshirt};
+                        e.target.src = defaultTshirt;
                       }}
                     />
                     <Box sx={{ flex: 1 }}>
@@ -378,9 +347,7 @@ const orderData = {
                 disabled={loading || stripeLoading || !shippingAddress?.street || !paymentMethod}
                 sx={{ py: 1.5 }}
               >
-                {loading ? (
-                  <CircularProgress size={24} color="inherit" />
-                ) : stripeLoading ? (
+                {loading || stripeLoading ? (
                   <CircularProgress size={24} color="inherit" />
                 ) : (
                   `Place Order - $${totalPrice.toFixed(2)}`
@@ -426,7 +393,7 @@ const orderData = {
         </Grid>
       </Grid>
 
-      {/* Stripe Payment Dialog */}
+      {/* Stripe Payment Dialog - only shown once */}
       <StripePayment
         open={showStripePayment}
         onClose={handlePaymentClose}
@@ -450,24 +417,6 @@ const orderData = {
           </Typography>
         </Box>
       )}
-
-            <Button
-        fullWidth
-        variant="contained"
-        size="large"
-        onClick={placeOrderHandler}
-        disabled={loading || stripeLoading || !shippingAddress || !paymentMethod}
-      >
-        {loading ? 'Placing Order...' : `Place Order - $${totalPrice.toFixed(2)}`}
-      </Button>
-
-      {/* Stripe Payment Dialog */}
-      <StripePayment
-        open={showStripePayment}
-        onClose={() => setShowStripePayment(false)}
-        order={createdOrder}
-        onSuccess={handlePaymentSuccess}
-      />
     </Container>
   );
 };

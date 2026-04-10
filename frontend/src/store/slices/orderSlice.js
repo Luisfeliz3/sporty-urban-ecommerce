@@ -1,3 +1,4 @@
+// store/slices/orderSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import API from '../../utils/api';
 
@@ -11,7 +12,9 @@ export const createOrder = createAsyncThunk(
       const { data } = await API.post('/orders', orderData);
 
       console.log('✅ Order created successfully:', data);
-      return data.data;
+      
+      // Return the entire data object which contains { success, data, message }
+      return data;
     } catch (error) {
       console.error('❌ Order creation error:', error);
       
@@ -30,7 +33,7 @@ export const getOrderDetails = createAsyncThunk(
   async (orderId, { rejectWithValue }) => {
     try {
       const { data } = await API.get(`/orders/${orderId}`);
-      return data.data;
+      return data;
     } catch (error) {
       const errorMessage = error.response?.data?.message 
         || error.message 
@@ -47,7 +50,7 @@ export const payOrder = createAsyncThunk(
   async ({ orderId, paymentResult }, { rejectWithValue }) => {
     try {
       const { data } = await API.put(`/orders/${orderId}/pay`, paymentResult);
-      return data.data;
+      return data;
     } catch (error) {
       const errorMessage = error.response?.data?.message 
         || error.message 
@@ -64,11 +67,45 @@ export const getMyOrders = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const { data } = await API.get('/orders/myorders');
-      return data.data;
+      return data;
     } catch (error) {
       const errorMessage = error.response?.data?.message 
         || error.message 
         || 'Failed to fetch orders';
+      
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+// Get all orders (admin only)
+export const getAllOrders = createAsyncThunk(
+  'order/getAllOrders',
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get('/orders');
+      return data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.message 
+        || error.message 
+        || 'Failed to fetch all orders';
+      
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+// Update order to delivered (admin only)
+export const deliverOrder = createAsyncThunk(
+  'order/deliverOrder',
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const { data } = await API.put(`/orders/${orderId}/deliver`);
+      return data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.message 
+        || error.message 
+        || 'Failed to update order status';
       
       return rejectWithValue(errorMessage);
     }
@@ -83,6 +120,7 @@ const orderSlice = createSlice({
     loading: false,
     error: null,
     success: false,
+    paymentProcessing: false,
   },
   reducers: {
     clearOrder: (state) => {
@@ -98,6 +136,10 @@ const orderSlice = createSlice({
       state.loading = false;
       state.error = null;
       state.success = false;
+      state.paymentProcessing = false;
+    },
+    setPaymentProcessing: (state, action) => {
+      state.paymentProcessing = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -110,7 +152,14 @@ const orderSlice = createSlice({
       })
       .addCase(createOrder.fulfilled, (state, action) => {
         state.loading = false;
-        state.order = action.payload;
+        // Handle both possible response structures
+        if (action.payload && action.payload.data) {
+          state.order = action.payload.data;
+        } else if (action.payload && action.payload._id) {
+          state.order = action.payload;
+        } else {
+          state.order = action.payload;
+        }
         state.success = true;
       })
       .addCase(createOrder.rejected, (state, action) => {
@@ -125,7 +174,11 @@ const orderSlice = createSlice({
       })
       .addCase(getOrderDetails.fulfilled, (state, action) => {
         state.loading = false;
-        state.order = action.payload;
+        if (action.payload && action.payload.data) {
+          state.order = action.payload.data;
+        } else {
+          state.order = action.payload;
+        }
       })
       .addCase(getOrderDetails.rejected, (state, action) => {
         state.loading = false;
@@ -135,14 +188,22 @@ const orderSlice = createSlice({
       .addCase(payOrder.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.paymentProcessing = true;
       })
       .addCase(payOrder.fulfilled, (state, action) => {
         state.loading = false;
-        state.order = action.payload;
+        state.paymentProcessing = false;
+        if (action.payload && action.payload.data) {
+          state.order = action.payload.data;
+        } else {
+          state.order = action.payload;
+        }
+        state.success = true;
       })
       .addCase(payOrder.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        state.paymentProcessing = false;
       })
       // Get user orders
       .addCase(getMyOrders.pending, (state) => {
@@ -151,14 +212,56 @@ const orderSlice = createSlice({
       })
       .addCase(getMyOrders.fulfilled, (state, action) => {
         state.loading = false;
-        state.orders = action.payload;
+        if (action.payload && action.payload.data) {
+          state.orders = action.payload.data;
+        } else if (Array.isArray(action.payload)) {
+          state.orders = action.payload;
+        } else {
+          state.orders = [];
+        }
       })
       .addCase(getMyOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Get all orders (admin)
+      .addCase(getAllOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getAllOrders.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload && action.payload.data) {
+          state.orders = action.payload.data;
+        } else if (Array.isArray(action.payload)) {
+          state.orders = action.payload;
+        } else {
+          state.orders = [];
+        }
+      })
+      .addCase(getAllOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Deliver order (admin)
+      .addCase(deliverOrder.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deliverOrder.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload && action.payload.data) {
+          state.order = action.payload.data;
+        } else {
+          state.order = action.payload;
+        }
+      })
+      .addCase(deliverOrder.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
   },
 });
 
-export const { clearOrder, clearOrderError, resetOrderState } = orderSlice.actions;
+export const { clearOrder, clearOrderError, resetOrderState, setPaymentProcessing } = orderSlice.actions;
 export default orderSlice.reducer;

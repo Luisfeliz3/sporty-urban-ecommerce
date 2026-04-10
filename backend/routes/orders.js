@@ -1,6 +1,8 @@
+// backend/routes/orders.js
 const express = require('express');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const User = require('../models/User');
 const auth = require('../middleware/auth');
 const router = express.Router();
 
@@ -22,8 +24,9 @@ router.post('/', auth, async (req, res) => {
       totalPrice,
     } = req.body;
 
-
-        // Create Stripe customer if not exists
+    // REMOVE THIS BLOCK - It's causing the error
+    // This code doesn't belong here and stripe is not defined
+    /*
     if (!req.user.stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: req.user.email,
@@ -33,11 +36,12 @@ router.post('/', auth, async (req, res) => {
         }
       });
       
-      // Update user with Stripe customer ID
       await User.findByIdAndUpdate(req.user._id, {
         stripeCustomerId: customer.id
       });
     }
+    */
+
     // Validation
     if (!orderItems || orderItems.length === 0) {
       return res.status(400).json({
@@ -209,7 +213,7 @@ router.get('/myorders', auth, async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user._id })
       .sort({ createdAt: -1 })
-      .populate('orderItems.product', 'name s');
+      .populate('orderItems.product', 'name images');
 
     res.json({
       success: true,
@@ -236,7 +240,9 @@ router.get('/', auth, async (req, res) => {
         message: 'Admin access required'
       });
     }
-        // Create Stripe customer if not exists
+
+    // REMOVE THIS BLOCK AS WELL - It's also causing the error
+    /*
     if (!req.user.stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: req.user.email,
@@ -246,12 +252,11 @@ router.get('/', auth, async (req, res) => {
         }
       });
       
-      // Update user with Stripe customer ID
       await User.findByIdAndUpdate(req.user._id, {
         stripeCustomerId: customer.id
       });
     }
-
+    */
 
     const orders = await Order.find({})
       .populate('user', 'name email')
@@ -267,6 +272,46 @@ router.get('/', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching orders'
+    });
+  }
+});
+
+// @desc    Update order to delivered (Admin)
+// @route   PUT /api/orders/:id/deliver
+// @access  Private/Admin
+router.put('/:id/deliver', auth, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    order.isDelivered = true;
+    order.deliveredAt = Date.now();
+
+    const updatedOrder = await order.save();
+
+    res.json({
+      success: true,
+      data: updatedOrder,
+      message: 'Order delivered successfully'
+    });
+  } catch (error) {
+    console.error('Update order to delivered error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating order delivery status'
     });
   }
 });

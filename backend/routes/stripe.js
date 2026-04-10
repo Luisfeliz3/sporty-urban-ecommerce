@@ -1,3 +1,4 @@
+// backend/routes/stripe.js
 const express = require('express');
 const stripe = require('../config/stripe');
 const Order = require('../models/Order');
@@ -6,7 +7,7 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const router = express.Router();
 
-// @desc    Create Stripe payment intent
+// @desc    Create Stripe payment intent with support for multiple payment methods
 // @route   POST /api/stripe/create-payment-intent
 // @access  Private
 router.post('/create-payment-intent', auth, async (req, res) => {
@@ -58,20 +59,32 @@ router.post('/create-payment-intent', auth, async (req, res) => {
       });
     }
 
-    // Create payment intent
+    // Enable multiple payment methods
+    const paymentMethodTypes = ['card'];
+    
+    // Add Apple Pay and Google Pay if enabled in Stripe dashboard
+    // These are automatically handled by Stripe's payment element
+    
+    // Add ACH (bank account) for US customers
+    if (order.user.country === 'US' || !order.user.country) {
+      paymentMethodTypes.push('us_bank_account');
+    }
+
+    // Create payment intent with automatic payment methods
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(order.totalPrice * 100), // Convert to cents
       currency: 'usd',
       customer: customerId,
       automatic_payment_methods: {
         enabled: true,
+        allow_redirects: 'never',
       },
       metadata: {
         orderId: order._id.toString(),
         userId: order.user._id.toString()
       },
-      setup_future_usage: savePaymentMethod ? 'on_session' : undefined,
-      description: `Order #${order._id} - EM`,
+      setup_future_usage: savePaymentMethod ? 'off_session' : undefined,
+      description: `Order #${order._id.toString().slice(-8)}`,
       shipping: {
         name: order.user.name,
         address: {
@@ -93,13 +106,171 @@ router.post('/create-payment-intent', auth, async (req, res) => {
     res.json({
       success: true,
       clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id
+      paymentIntentId: paymentIntent.id,
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
     });
   } catch (error) {
     console.error('❌ Create payment intent error:', error);
     res.status(500).json({
       success: false,
       message: 'Error creating payment intent: ' + error.message
+    });
+  }
+});
+
+// Add this to your backend/routes/stripe.js
+
+// @desc    Create payment intent with saved payment method
+// @route   POST /api/stripe/create-payment-intent-saved
+// @access  Private
+router.post('/create-payment-intent-saved', auth, async (req, res) => {
+  try {
+    const { orderId, paymentMethodId } = req.body;
+
+    const order = await Order.findById(orderId).populate('user');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Get or create customer
+    let customerId = order.user.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: order.user.email,
+        name: order.user.name,
+        metadata: {
+          userId: order.user._id.toString()
+        }
+      });
+      customerId = customer.id;
+      
+      await User.findByIdAndUpdate(order.user._id, {
+        stripeCustomerId: customerId
+      });
+    }
+
+    // Create and confirm payment intent with saved payment method
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(order.totalPrice * 100),
+      currency: 'usd',
+      customer: customerId,
+      payment_method: paymentMethodId,
+      off_session: true,
+      confirm: true,
+      metadata: {
+        orderId: order._id.toString(),
+        userId: order.user._id.toString()
+      },
+    });
+
+    if (paymentIntent.status === 'succeeded') {
+      // Update order as paid
+      order.isPaid = true;
+      order.paidAt = Date.now();
+      order.paymentResult = {
+        id: paymentIntent.id,
+        status: paymentIntent.status,
+        update_time: new Date().toISOString(),
+      };
+      order.stripePaymentMethod = paymentMethodId;
+      await order.save();
+    }
+
+    res.json({
+      success: true,
+      paymentIntent,
+      order
+    });
+  } catch (error) {
+    console.error('Error creating saved payment intent:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @desc    Create payment intent for saved payment method
+// @route   POST /api/stripe/create-payment-intent-saved
+// @access  Private
+router.post('/create-payment-intent-saved', auth, async (req, res) => {
+  try {
+    const { orderId, paymentMethodId } = req.body;
+    
+    console.log('Processing saved card payment for order:', orderId);
+    console.log('Payment method ID:', paymentMethodId);
+
+    const order = await Order.findById(orderId).populate('user');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Get or create customer
+    let customerId = order.user.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: order.user.email,
+        name: order.user.name,
+        metadata: {
+          userId: order.user._id.toString()
+        }
+      });
+      customerId = customer.id;
+      
+      await User.findByIdAndUpdate(order.user._id, {
+        stripeCustomerId: customerId
+      });
+    }
+
+// Create and confirm payment intent with saved payment method
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(order.totalPrice * 100),
+      currency: 'usd',
+      customer: customerId,
+      payment_method: paymentMethodId,
+      off_session: true,
+      confirm: true,
+      metadata: {
+        orderId: order._id.toString(),
+        userId: order.user._id.toString()
+      },
+    });
+
+    console.log('Payment intent status:', paymentIntent.status);
+
+    if (paymentIntent.status === 'succeeded') {
+      // Update order as paid
+      order.isPaid = true;
+      order.paidAt = Date.now();
+      order.paymentResult = {
+        id: paymentIntent.id,
+        status: paymentIntent.status,
+        update_time: new Date().toISOString(),
+      };
+      order.stripePaymentMethod = paymentMethodId;
+      await order.save();
+      
+      console.log('Order updated successfully:', order._id);
+    }
+
+    res.json({
+      success: true,
+      paymentIntent,
+      order
+    });
+  } catch (error) {
+    console.error('Error creating saved payment intent:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 });
@@ -194,7 +365,7 @@ router.post('/create-setup-intent', auth, async (req, res) => {
 
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'us_bank_account'],
       metadata: {
         userId: user._id.toString(),
         purpose: 'save_payment_method'
@@ -229,20 +400,34 @@ router.get('/payment-methods', auth, async (req, res) => {
       });
     }
 
-    const paymentMethods = await stripe.paymentMethods.list({
+    // Get cards
+    const cards = await stripe.paymentMethods.list({
       customer: user.stripeCustomerId,
       type: 'card',
     });
 
-    const formattedPaymentMethods = paymentMethods.data.map(pm => ({
+    // Get bank accounts (ACH)
+    const bankAccounts = await stripe.paymentMethods.list({
+      customer: user.stripeCustomerId,
+      type: 'us_bank_account',
+    });
+
+    const allPaymentMethods = [...cards.data, ...bankAccounts.data];
+
+    const formattedPaymentMethods = allPaymentMethods.map(pm => ({
       id: pm.id,
       type: pm.type,
-      card: {
+      card: pm.card ? {
         brand: pm.card.brand,
         last4: pm.card.last4,
         exp_month: pm.card.exp_month,
         exp_year: pm.card.exp_year
-      },
+      } : null,
+      bank: pm.us_bank_account ? {
+        bank_name: pm.us_bank_account.bank_name,
+        last4: pm.us_bank_account.last4,
+        routing_number: pm.us_bank_account.routing_number
+      } : null,
       isDefault: pm.id === user.defaultPaymentMethodId
     }));
 
@@ -329,6 +514,10 @@ router.post('/webhook', express.raw({type: 'application/json'}), async (req, res
     case 'payment_intent.payment_failed':
       const failedPaymentIntent = event.data.object;
       await handlePaymentIntentFailed(failedPaymentIntent);
+      break;
+    case 'payment_method.attached':
+      const paymentMethod = event.data.object;
+      console.log('Payment method attached:', paymentMethod.id);
       break;
     default:
       console.log(`Unhandled event type: ${event.type}`);

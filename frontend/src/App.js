@@ -24,6 +24,9 @@ import OrderSuccessPage from './pages/OrderSuccessPage';
 import AdminDashboard from './pages/AdminDashboard';
 import ProductsPage from './pages/ProductsPage';
 import { mergeDuplicateItems } from './store/slices/cartSlice';
+import OrderConfirmationPage from './pages/OrderConfirmationPage';
+
+
 function App() {
 
  const dispatch = useDispatch();
@@ -81,6 +84,7 @@ function App() {
                 <Route path="/order-success" element={<OrderSuccessPage />} />
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/products" element={<ProductsPage />} />
+                <Route path="/order/:id" element={<OrderConfirmationPage />} />
               </Routes>
             </main>
           </div>
