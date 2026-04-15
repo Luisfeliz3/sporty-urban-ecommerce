@@ -29,6 +29,7 @@ import {
   syncCartWithServer,
 } from '../store/slices/cartSlice';
 import { selectUniqueCartItems } from '../store/slices/cartSlice';
+import no_image_avl from "../images/no_images.jpeg";
 
 const CartPage = () => {
   const dispatch = useDispatch();
@@ -223,7 +224,8 @@ const CartPage = () => {
                               borderRadius: 4,
                             }}
                             onError={(e) => {
-                              e.target.src = '/placeholder-image.jpg';
+                              // e.target.src = '/placeholder-image.jpg';
+                              e.target.src = no_image_avl
                             }}
                           />
                           <Typography variant="body1">{item.name}</Typography>

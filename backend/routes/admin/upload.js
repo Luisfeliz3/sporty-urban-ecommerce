@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const auth = require('../../middleware/auth');
-const { uploadToGCS } = require('../../config/cloudStorage');
+const { uploadToGCS, deleteMultipleFromGCS } = require('../../config/cloudStorage');
 const router = express.Router();
 
 // Configure multer for memory storage
@@ -9,14 +9,13 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB per file
   },
   fileFilter: (req, file, cb) => {
-    // Accept only images
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'), false);
+      cb(new Error('Only image files are allowed!'), false);
     }
   },
 });
@@ -33,65 +32,69 @@ const adminRequired = (req, res, next) => {
   }
 };
 
-// @desc    Upload multiple images to Google Cloud Storage
+// @desc    Upload multiple images to GCS
 // @route   POST /api/admin/upload/images
 // @access  Private/Admin
 router.post('/images', auth, adminRequired, upload.array('images', 10), async (req, res) => {
   try {
-    console.log('=== UPLOAD REQUEST RECEIVED ===');
+    console.log('=== UPLOAD IMAGES REQUEST ===');
     console.log('Files received:', req.files ? req.files.length : 0);
-    console.log('Body:', req.body);
     
     if (!req.files || req.files.length === 0) {
-      console.log('No files in request');
       return res.status(400).json({
         success: false,
-        message: 'No image files provided'
+        message: 'No files uploaded'
       });
     }
 
     const uploadedImages = [];
-    const errors = [];
     
     for (let i = 0; i < req.files.length; i++) {
       const file = req.files[i];
-      console.log(`Processing file ${i + 1}:`, file.originalname, file.size, file.mimetype);
+      console.log(`Processing file ${i + 1}:`, {
+        name: file.originalname,
+        size: file.size,
+        type: file.mimetype
+      });
       
       try {
-        const uploadedImage = await uploadToGCS(file, 'products');
-        console.log(`File ${i + 1} uploaded successfully:`, uploadedImage.url);
+        // Upload to GCS
+        const result = await uploadToGCS(file, 'products');
+        
         uploadedImages.push({
-          url: uploadedImage.url,
-          filename: uploadedImage.filename,
-          contentType: uploadedImage.contentType,
-          size: uploadedImage.size,
-          isPrimary: i === 0
+          url: result.url,
+          filename: result.filename,
+          contentType: result.contentType,
+          size: result.size,
+          originalName: file.originalname,
+          uploadedAt: new Date()
         });
+        
+        console.log(`✅ Image ${i + 1} uploaded: ${result.url}`);
       } catch (uploadError) {
-        console.error(`Error uploading file ${i + 1}:`, uploadError);
-        errors.push({
-          file: file.originalname,
-          error: uploadError.message
-        });
+        console.error(`❌ Error uploading image ${i + 1}:`, uploadError.message);
+        // Continue with other images
       }
     }
-
+    
     if (uploadedImages.length === 0) {
       return res.status(500).json({
         success: false,
-        message: 'Failed to upload any images',
-        errors: errors
+        message: 'Failed to upload any images'
       });
     }
-
-    res.json({
+    
+    console.log(`✅ Successfully uploaded ${uploadedImages.length} images`);
+    console.log('Response data:', JSON.stringify(uploadedImages, null, 2));
+    
+    res.status(200).json({
       success: true,
       data: uploadedImages,
-      message: `${uploadedImages.length} image(s) uploaded successfully`,
-      errors: errors.length > 0 ? errors : undefined
+      message: `${uploadedImages.length} image(s) uploaded successfully`
     });
+    
   } catch (error) {
-    console.error('Upload endpoint error:', error);
+    console.error('❌ Upload error:', error);
     res.status(500).json({
       success: false,
       message: 'Error uploading images: ' + error.message
@@ -99,36 +102,32 @@ router.post('/images', auth, adminRequired, upload.array('images', 10), async (r
   }
 });
 
-// Single image upload endpoint
-router.post('/image', auth, adminRequired, upload.single('image'), async (req, res) => {
+// @desc    Delete images from GCS
+// @route   DELETE /api/admin/upload/images
+// @access  Private/Admin
+router.delete('/images', auth, adminRequired, async (req, res) => {
   try {
-    console.log('=== SINGLE UPLOAD REQUEST ===');
-    console.log('File:', req.file);
+    const { filenames } = req.body;
     
-    if (!req.file) {
+    if (!filenames || !Array.isArray(filenames) || filenames.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No image file provided'
+        message: 'No filenames provided'
       });
     }
-
-    const uploadedImage = await uploadToGCS(req.file, 'products');
+    
+    await deleteMultipleFromGCS(filenames);
     
     res.json({
       success: true,
-      data: {
-        url: uploadedImage.url,
-        filename: uploadedImage.filename,
-        contentType: uploadedImage.contentType,
-        size: uploadedImage.size
-      },
-      message: 'Image uploaded successfully'
+      message: `${filenames.length} image(s) deleted successfully`
     });
+    
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('Delete error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error uploading image: ' + error.message
+      message: 'Error deleting images: ' + error.message
     });
   }
 });

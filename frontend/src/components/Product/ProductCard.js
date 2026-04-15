@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardMedia,
@@ -8,86 +8,163 @@ import {
   Button,
   Box,
   Chip,
+  Rating,
 } from '@mui/material';
 import { AddShoppingCart, FavoriteBorder } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { addToCartLocal } from '../../store/slices/cartSlice';
-import defaultTshirt from "./defaultTshirt.png";
-
+import defaultProductImg from "../../images/no_images.jpeg";
+import ProductImage from '../Common/ProductImage';
 
 const ProductCard = ({ product }) => {
   const dispatch = useDispatch();
+  const [imgError, setImgError] = useState(false);
 
-  const handleAddToCart = () => {
-   // Make sure we have valid size and color
-  const defaultSize = product.sizes && product.sizes.length > 0 ? product.sizes[0] : 'M';
-  const defaultColor = product.colors && product.colors.length > 0 ? product.colors[0] : 'Black';
-  
-  dispatch(addToCartLocal({
+  // Helper function to get the correct image URL
+  const getImageUrl = () => {
+    if (!product.images || product.images.length === 0) {
+      return defaultProductImg;
+    }
     
-    product: product._id,  // This should match what backend expects
-    name: product.name,
-    price: product.price,
-    image: product.images[0]?.url || product.images[0] || defaultTshirt,
-    size: defaultSize,
-    color: defaultColor,
-    quantity: 1,
-  }));
-
+    const primaryImage = product.images.find(img => img.isPrimary) || product.images[0];
+    let imageUrl = primaryImage?.url;
+    
+    // If no URL found, use default
+    if (!imageUrl) {
+      return defaultProductImg;
+    }
+    
+    // If the URL is relative, make sure it starts correctly
+    if (imageUrl.startsWith('/')) {
+      return imageUrl;
+    }
+    
+    // If it's an absolute URL from GCS, use as is
+    if (imageUrl.startsWith('http')) {
+      return imageUrl;
+    }
+    
+    // Default fallback
+    return defaultProductImg;
   };
 
+  const handleAddToCart = () => {
+    const defaultVariant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
+    
+    dispatch(addToCartLocal({
+      product: product._id,
+      name: product.name,
+      price: defaultVariant ? defaultVariant.price : product.price,
+      image: getImageUrl(),
+      variant: defaultVariant ? defaultVariant.name : 'Standard',
+      quantity: 1,
+    }));
+  };
+
+  const displayPrice = product.variants && product.variants.length > 0 
+    ? product.variants[0].price 
+    : product.price;
+
+  const displayOriginalPrice = product.variants && product.variants.length > 0 && product.variants[0].originalPrice
+    ? product.variants[0].originalPrice
+    : product.originalPrice;
+
+  const getProductTypeLabel = (type) => {
+    const types = {
+      detergent: 'Laundry',
+      beauty: 'Beauty',
+      homecare: 'Home Care',
+      grocery: 'Grocery',
+      health: 'Health',
+      homekitchen: 'Home & Kitchen',
+      baby: 'Baby Care',
+      pet: 'Pet Care'
+    };
+    return types[type] || type;
+  };
+
+  const imageUrl = getImageUrl();
+  
+  console.log('Product image URL:', imageUrl); // Debug log
+
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <CardMedia
-        component="img"  
-        height="290"
-       image={product.images[0]?.url || product.images[0] || defaultTshirt}
-        alt={product.name}
-        sx={{ objectFit: 'cover' }}
-      />
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {product.featured && (
+        <Chip
+          label="Featured"
+          color="primary"
+          size="small"
+          sx={{ position: 'absolute', top: 10, left: 10, zIndex: 1 }}
+        />
+      )}
+      
+      <ProductImage product={product} size="card" />
+      
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-          <Typography variant="h6" component="h2" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>
-            {product.name}
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            {product.brand}
           </Typography>
           <Chip
-            label={product.sportType}
+            label={getProductTypeLabel(product.productType)}
             size="small"
-            color="primary"
             variant="outlined"
+            sx={{ fontSize: '0.7rem' }}
           />
         </Box>
         
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {product.brand}
+        <Typography 
+          variant="h6" 
+          component={Link} 
+          to={`/product/${product._id}`} 
+          sx={{ 
+            textDecoration: 'none', 
+            color: 'inherit',
+            '&:hover': { color: 'primary.main' },
+            fontSize: '1rem',
+            fontWeight: 600,
+            display: 'block',
+            mb: 1
+          }}
+        >
+          {product.name}
         </Typography>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
           <Typography variant="h6" color="primary.main" fontWeight="600">
-            ${product.price}
+            ${displayPrice}
           </Typography>
-          {product.originalPrice && (
+          {displayOriginalPrice && (
             <Typography
               variant="body2"
               color="text.secondary"
               sx={{ textDecoration: 'line-through' }}
             >
-              ${product.originalPrice}
+              ${displayOriginalPrice}
             </Typography>
           )}
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-          {product.tags.slice(0, 2).map((tag, index) => (
-            <Chip
-              key={index}
-              label={tag}
-              size="small"
-              variant="outlined"
-              sx={{ fontSize: '0.rem' }}
-            />
-          ))}
+        {product.rating > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <Rating value={product.rating} readOnly size="small" />
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+              ({product.reviewCount})
+            </Typography>
+          </Box>
+        )}
+
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
+          {product.attributes?.packSize && (
+            <Chip label={product.attributes.packSize} size="small" variant="outlined" />
+          )}
+          {product.attributes?.weight?.value && (
+            <Chip label={`${product.attributes.weight.value}${product.attributes.weight.unit}`} size="small" variant="outlined" />
+          )}
+          {product.attributes?.quantity > 1 && (
+            <Chip label={`${product.attributes.quantity}-pack`} size="small" variant="outlined" />
+          )}
         </Box>
       </CardContent>
       
@@ -98,10 +175,9 @@ const ProductCard = ({ product }) => {
           startIcon={<AddShoppingCart />}
           onClick={handleAddToCart}
           size="small"
+          disabled={product.inventory === 0}
         >
-           <Typography variant="h1" component="h2" sx={{ fontSize: '0.7rem', fontWeight: 600 }}>
-            {"Add To Cart"}
-          </Typography>
+          {product.inventory === 0 ? 'Out of Stock' : 'Add to Cart'}
         </Button>
         <Button
           component={Link}

@@ -33,87 +33,68 @@ const adminRequired = (req, res, next) => {
   }
 };
 
+// In adminRoutes.js - Fix create product endpoint
 
-// @desc    Create new product
-// @route   POST /api/admin/products
-// @access  Private/Admin
-router.post('/', auth, adminRequired, upload.array('images', 5), async (req, res) => {
+router.post('/', auth, adminRequired, async (req, res) => {
   try {
     console.log('🆕 Creating new product...');
-    console.log('Body:', req.body);
-    console.log('Files:', req.files ? req.files.length : 0);
-
+    console.log('Featured value received:', req.body.featured);
+    console.log('Featured type:', typeof req.body.featured);
+    
     const {
       name,
       description,
+      shortDescription,
       price,
       originalPrice,
       category,
+      subcategory,
       brand,
-      sizes,
-      colors,
+      productType,
       inventory,
-      featured,
-      sportType,
-      tags
+      featured,  // Make sure this is captured
+      tags,
+      attributes,
+      variants,
+      images,
+      seo
     } = req.body;
 
-    // Validation
-    if (!name || !description || !price || !category || !brand || !sportType) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide all required fields: name, description, price, category, brand, sportType'
-      });
-    }
+    // Ensure featured is a boolean
+    const isFeatured = featured === true || featured === 'true';
+    
+    console.log('Featured after conversion:', isFeatured);
 
-    // Parse arrays
-    const sizesArray = Array.isArray(sizes) ? sizes : (sizes ? sizes.split(',') : []);
-    const colorsArray = Array.isArray(colors) ? colors : (colors ? JSON.parse(colors) : []);
-    const tagsArray = Array.isArray(tags) ? tags : (tags ? tags.split(',') : []);
-
-    // Upload images to GCS and get URLs
-    const productImages = req.body.images || [];
-    if (req.files && req.files.length > 0) {
-      for (let i = 0; i < req.files.length; i++) {
-        const file = req.files[i];
-        try {
-          const uploadedImage = await uploadToGCS(file, 'products');
-          productImages.push({
-            url: uploadedImage.url,
-            filename: uploadedImage.filename,
-            contentType: uploadedImage.contentType,
-            isPrimary: i === 0,
-            alt: `${name} - Image ${i + 1}`,
-            size: uploadedImage.size,
-            uploadedAt: new Date()
-          });
-        } catch (uploadError) {
-          console.error(`Error uploading image ${i}:`, uploadError);
-          // If upload fails, continue with other images
-        }
-      }
-    }
-
-    // Create product
-    const product = new Product({
+    // Create product with featured status
+    const productData = {
       name: name.trim(),
       description: description.trim(),
+      shortDescription: shortDescription ? shortDescription.trim() : description.substring(0, 200),
       price: parseFloat(price),
       originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
       category,
+      subcategory: subcategory || '',
       brand: brand.trim(),
-      sizes: sizesArray,
-      colors: colorsArray,
+      productType,
       inventory: parseInt(inventory) || 0,
-      featured: featured === 'true',
-      sportType,
-      tags: tagsArray,
-      images: productImages
+      featured: isFeatured, // Use the converted boolean
+      tags: parsedTags,
+      images: parsedImages,
+      attributes: cleanedAttributes,
+      variants: parsedVariants,
+      seo: parsedSeo
+    };
+
+    console.log('Product data being saved:', {
+      ...productData,
+      featured: productData.featured,
+      featuredType: typeof productData.featured
     });
 
+    const product = new Product(productData);
     const savedProduct = await product.save();
-
-    console.log('✅ Product created successfully:', savedProduct._id);
+    
+    console.log('✅ Product created with featured status:', savedProduct.featured);
 
     res.status(201).json({
       success: true,
@@ -123,20 +104,24 @@ router.post('/', auth, adminRequired, upload.array('images', 5), async (req, res
   } catch (error) {
     console.error('❌ Create product error:', error);
     
-    if (error.code === 11000) {
+    if (error.name === 'ValidationError') {
+      const validationErrors = {};
+      for (let field in error.errors) {
+        validationErrors[field] = error.errors[field].message;
+      }
       return res.status(400).json({
         success: false,
-        message: 'Product with similar details already exists'
+        message: 'Validation failed',
+        errors: validationErrors
       });
     }
-
+    
     res.status(500).json({
       success: false,
       message: 'Error creating product: ' + error.message
     });
   }
 });
-
 
 // @desc    Get all products (admin view with more details)
 // @route   GET /api/admin/products
@@ -146,14 +131,28 @@ router.get('/', auth, adminRequired, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
+    const search = req.query.search || '';
+    const category = req.query.category || '';
+    const productType = req.query.productType || '';
 
-    const products = await Product.find({})
+    // Build filter
+    const filter = {};
+    if (search) {
+      filter.$text = { $search: search };
+    }
+    if (category) {
+      filter.category = category;
+    }
+    if (productType) {
+      filter.productType = productType;
+    }
+
+    const products = await Product.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit)
-      .select('-images.data'); // Don't send image data in list
+      .limit(limit);
 
-    const total = await Product.countDocuments();
+    const total = await Product.countDocuments(filter);
 
     res.json({
       success: true,
@@ -175,105 +174,10 @@ router.get('/', auth, adminRequired, async (req, res) => {
   }
 });
 
-// @desc    Create new product
-// @route   POST /api/admin/products
-// @access  Private/Admin
-router.post('/', auth, adminRequired, upload.array('images', 5), async (req, res) => {
-  try {
-    console.log('🆕 Creating new product...');
-    console.log('Body:', req.body);
-    console.log('Files:', req.files ? req.files.length : 0);
-
-    const {
-      name,
-      description,
-      price,
-      originalPrice,
-      category,
-      brand,
-      sizes,
-      colors,
-      inventory,
-      featured,
-      sportType,
-      tags
-    } = req.body;
-
-    // Validation
-    if (!name || !description || !price || !category || !brand || !sportType) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide all required fields: name, description, price, category, brand, sportType'
-      });
-    }
-
-    // Parse arrays
-    const sizesArray = Array.isArray(sizes) ? sizes : (sizes ? sizes.split(',') : []);
-    const colorsArray = Array.isArray(colors) ? colors : (colors ? JSON.parse(colors) : []);
-    const tagsArray = Array.isArray(tags) ? tags : (tags ? tags.split(',') : []);
-
-    // Process images
-    const productImages = req.files ? req.files.map((file, index) => ({
-      data: file.buffer,
-      contentType: file.mimetype,
-      filename: file.originalname,
-      isPrimary: index === 0,
-      alt: `${name} - Image ${index + 1}`,
-      size: file.size
-    })) : [];
-
-    // Create product
-    const product = new Product({
-      name: name.trim(),
-      description: description.trim(),
-      price: parseFloat(price),
-      originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
-      category,
-      brand: brand.trim(),
-      sizes: sizesArray,
-      colors: colorsArray,
-      inventory: parseInt(inventory) || 0,
-      featured: featured === 'true',
-      sportType,
-      tags: tagsArray,
-      images: productImages
-    });
-
-    const savedProduct = await product.save();
-
-    console.log('✅ Product created successfully:', savedProduct._id);
-
-    // Don't send image data in response
-    const responseProduct = savedProduct.toObject();
-    delete responseProduct.images;
-
-    res.status(201).json({
-      success: true,
-      data: responseProduct,
-      message: 'Product created successfully'
-    });
-  } catch (error) {
-    console.error('❌ Create product error:', error);
-    
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'Product with similar details already exists'
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Error creating product: ' + error.message
-    });
-  }
-});
-
-
 // @desc    Update product
 // @route   PUT /api/admin/products/:id
 // @access  Private/Admin
-router.put('/:id', auth, adminRequired, upload.array('images', 5), async (req, res) => {
+router.put('/:id', auth, adminRequired, upload.array('images', 10), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
 
@@ -287,47 +191,73 @@ router.put('/:id', auth, adminRequired, upload.array('images', 5), async (req, r
     const {
       name,
       description,
+      shortDescription,
       price,
       originalPrice,
       category,
+      subcategory,
       brand,
-      sizes,
-      colors,
+      productType,
       inventory,
       featured,
-      sportType,
       tags,
       isActive,
+      attributes,
+      variants,
+      seo,
       removeImages
     } = req.body;
 
     // Update fields
     if (name) product.name = name.trim();
     if (description) product.description = description.trim();
+    if (shortDescription) product.shortDescription = shortDescription.trim();
     if (price) product.price = parseFloat(price);
     if (originalPrice !== undefined) product.originalPrice = originalPrice ? parseFloat(originalPrice) : null;
     if (category) product.category = category;
+    if (subcategory !== undefined) product.subcategory = subcategory;
     if (brand) product.brand = brand.trim();
-    if (sizes) product.sizes = Array.isArray(sizes) ? sizes : sizes.split(',');
-    if (colors) product.colors = Array.isArray(colors) ? colors : JSON.parse(colors);
-    if (inventory !== undefined) product.inventory = parseInt(inventory);
-    if (featured !== undefined) product.featured = featured === 'true';
-    if (sportType) product.sportType = sportType;
-    if (tags) product.tags = Array.isArray(tags) ? tags : tags.split(',');
+    if (productType) product.productType = productType;
+    if (featured !== undefined) {
+      product.featured = featured === true || featured === 'true';
+      console.log('Updating featured to:', product.featured);
+    }
     if (isActive !== undefined) product.isActive = isActive === 'true';
+    if (tags) product.tags = Array.isArray(tags) ? tags : tags.split(',');
+    
+    // Update attributes
+    if (attributes) {
+      const parsedAttributes = typeof attributes === 'string' ? JSON.parse(attributes) : attributes;
+      product.attributes = { ...product.attributes, ...parsedAttributes };
+    }
+    
+    // Update variants
+    if (variants) {
+      const parsedVariants = typeof variants === 'string' ? JSON.parse(variants) : variants;
+      product.variants = parsedVariants;
+      
+      // Recalculate total inventory
+      product.inventory = parsedVariants.reduce((sum, variant) => sum + (parseInt(variant.inventory) || 0), 0);
+    } else if (inventory !== undefined) {
+      product.inventory = parseInt(inventory);
+    }
+    
+    // Update SEO
+    if (seo) {
+      const parsedSeo = typeof seo === 'string' ? JSON.parse(seo) : seo;
+      product.seo = { ...product.seo, ...parsedSeo };
+    }
 
     // Handle image removal - delete from GCS
     if (removeImages) {
       const removeIds = Array.isArray(removeImages) ? removeImages : removeImages.split(',');
       const imagesToRemove = product.images.filter(img => removeIds.includes(img._id.toString()));
       
-      // Delete from GCS
       const filenamesToDelete = imagesToRemove.map(img => img.filename).filter(f => f);
       if (filenamesToDelete.length > 0) {
         await deleteMultipleFromGCS(filenamesToDelete);
       }
       
-      // Remove from product
       product.images = product.images.filter(img => !removeIds.includes(img._id.toString()));
     }
 
@@ -353,7 +283,7 @@ router.put('/:id', auth, adminRequired, upload.array('images', 5), async (req, r
     }
 
     const updatedProduct = await product.save();
-
+console.log('✅ Product updated with featured status:', updatedProduct.featured);
     res.json({
       success: true,
       data: updatedProduct,
@@ -406,147 +336,6 @@ router.delete('/:id', auth, adminRequired, async (req, res) => {
   }
 });
 
-// @desc    Update product
-// @route   PUT /api/admin/products/:id
-// @access  Private/Admin
-router.put('/:id', auth, adminRequired, upload.array('images', 5), async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-
-    const {
-      name,
-      description,
-      price,
-      originalPrice,
-      category,
-      brand,
-      sizes,
-      colors,
-      inventory,
-      featured,
-      sportType,
-      tags,
-      isActive,
-      removeImages
-    } = req.body;
-
-    // Update fields
-    if (name) product.name = name.trim();
-    if (description) product.description = description.trim();
-    if (price) product.price = parseFloat(price);
-    if (originalPrice !== undefined) product.originalPrice = originalPrice ? parseFloat(originalPrice) : null;
-    if (category) product.category = category;
-    if (brand) product.brand = brand.trim();
-    if (sizes) product.sizes = Array.isArray(sizes) ? sizes : sizes.split(',');
-    if (colors) product.colors = Array.isArray(colors) ? colors : JSON.parse(colors);
-    if (inventory !== undefined) product.inventory = parseInt(inventory);
-    if (featured !== undefined) product.featured = featured === 'true';
-    if (sportType) product.sportType = sportType;
-    if (tags) product.tags = Array.isArray(tags) ? tags : tags.split(',');
-    if (isActive !== undefined) product.isActive = isActive === 'true';
-
-    // Handle image removal
-    if (removeImages) {
-      const removeIds = Array.isArray(removeImages) ? removeImages : removeImages.split(',');
-      product.images = product.images.filter(img => !removeIds.includes(img._id.toString()));
-    }
-
-    // Add new images
-    if (req.files && req.files.length > 0) {
-      const newImages = req.files.map((file, index) => ({
-        data: file.buffer,
-        contentType: file.mimetype,
-        filename: file.originalname,
-        isPrimary: product.images.length === 0 && index === 0, // Set as primary if no images exist
-        alt: `${product.name} - Image ${product.images.length + index + 1}`,
-        size: file.size
-      }));
-      product.images.push(...newImages);
-    }
-
-    const updatedProduct = await product.save();
-
-    // Don't send image data in response
-    const responseProduct = updatedProduct.toObject();
-    delete responseProduct.images;
-
-    res.json({
-      success: true,
-      data: responseProduct,
-      message: 'Product updated successfully'
-    });
-  } catch (error) {
-    console.error('Update product error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating product: ' + error.message
-    });
-  }
-});
-
-// @desc    Delete product
-// @route   DELETE /api/admin/products/:id
-// @access  Private/Admin
-router.delete('/:id', auth, adminRequired, async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-
-    await Product.findByIdAndDelete(req.params.id);
-
-    res.json({
-      success: true,
-      message: 'Product deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete product error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting product'
-    });
-  }
-});
-
-// @desc    Get product by ID (admin view with image data)
-// @route   GET /api/admin/products/:id
-// @access  Private/Admin
-router.get('/:id', auth, adminRequired, async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: product
-    });
-  } catch (error) {
-    console.error('Get admin product error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching product'
-    });
-  }
-});
-
 // @desc    Toggle product active status
 // @route   PATCH /api/admin/products/:id/toggle-active
 // @access  Private/Admin
@@ -576,6 +365,68 @@ router.patch('/:id/toggle-active', auth, adminRequired, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating product status'
+    });
+  }
+});
+
+// @desc    Bulk upload products via CSV
+// @route   POST /api/admin/products/bulk-upload
+// @access  Private/Admin
+router.post('/bulk-upload', auth, adminRequired, upload.single('csv'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload a CSV file'
+      });
+    }
+
+    const csvData = req.file.buffer.toString('utf8');
+    const lines = csvData.split('\n');
+    const headers = lines[0].split(',');
+    const products = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      
+      const values = lines[i].split(',');
+      const productData = {};
+      
+      headers.forEach((header, index) => {
+        productData[header.trim()] = values[index]?.trim() || '';
+      });
+      
+      products.push(productData);
+    }
+
+    // Process and save products
+    const savedProducts = [];
+    for (const productData of products) {
+      const product = new Product({
+        name: productData.name,
+        description: productData.description,
+        price: parseFloat(productData.price),
+        category: productData.category,
+        brand: productData.brand,
+        productType: productData.productType,
+        inventory: parseInt(productData.inventory) || 0,
+        tags: productData.tags ? productData.tags.split('|') : []
+      });
+      
+      const saved = await product.save();
+      savedProducts.push(saved);
+    }
+
+    res.json({
+      success: true,
+      data: savedProducts,
+      message: `${savedProducts.length} products uploaded successfully`
+    });
+  } catch (error) {
+    console.error('Bulk upload error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing bulk upload: ' + error.message
     });
   }
 });

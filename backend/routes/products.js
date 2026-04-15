@@ -11,16 +11,18 @@ router.get('/', async (req, res) => {
       page = 1,
       limit = 25,
       category,
+      subcategory,
       brand,
-      sportType,
+      productType,
       minPrice,
       maxPrice,
-      size,
-      color,
       featured,
       sortBy = 'createdAt',
       sortOrder = 'desc',
-      search
+      search,
+      minRating,
+      inStock,
+      attributes
     } = req.query;
 
     // Build filter object
@@ -31,14 +33,19 @@ router.get('/', async (req, res) => {
       filter.category = category;
     }
 
+    // Subcategory filter
+    if (subcategory && subcategory !== 'all') {
+      filter.subcategory = subcategory;
+    }
+
+    // Product Type filter
+    if (productType && productType !== 'all') {
+      filter.productType = productType;
+    }
+
     // Brand filter
     if (brand && brand !== 'all') {
       filter.brand = { $regex: brand, $options: 'i' };
-    }
-
-    // Sport type filter
-    if (sportType && sportType !== 'all') {
-      filter.sportType = sportType;
     }
 
     // Price range filter
@@ -48,14 +55,14 @@ router.get('/', async (req, res) => {
       if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
     }
 
-    // Size filter
-    if (size && size !== 'all') {
-      filter.sizes = size;
+    // Rating filter
+    if (minRating) {
+      filter.rating = { $gte: parseFloat(minRating) };
     }
 
-    // Color filter
-    if (color && color !== 'all') {
-      filter['colors.name'] = { $regex: color, $options: 'i' };
+    // Stock filter
+    if (inStock === 'true') {
+      filter.inventory = { $gt: 0 };
     }
 
     // Featured filter
@@ -73,13 +80,20 @@ router.get('/', async (req, res) => {
       ];
     }
 
+    // Dynamic attributes filter (for specific product type attributes)
+    if (attributes) {
+      const parsedAttrs = JSON.parse(attributes);
+      Object.keys(parsedAttrs).forEach(key => {
+        filter[`attributes.${key}`] = parsedAttrs[key];
+      });
+    }
+
     // Sort options
     const sortOptions = {};
     sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
     // Execute query with pagination
     const products = await Product.find(filter)
-      .select('-images.data') // Don't send image binary data
       .sort(sortOptions)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -115,32 +129,15 @@ router.get('/', async (req, res) => {
 const getAvailableFilters = async () => {
   const [
     categories,
+    subcategories,
     brands,
-    sportTypes,
-    sizes,
-    colors,
+    productTypes,
     priceRange
   ] = await Promise.all([
-    // Categories
     Product.distinct('category', { isActive: true }),
-    
-    // Brands
+    Product.distinct('subcategory', { isActive: true, subcategory: { $ne: '' } }),
     Product.distinct('brand', { isActive: true }),
-    
-    // Sport Types
-    Product.distinct('sportType', { isActive: true }),
-    
-    // Sizes
-    Product.distinct('sizes', { isActive: true }),
-    
-    // Colors
-    Product.aggregate([
-      { $match: { isActive: true } },
-      { $unwind: '$colors' },
-      { $group: { _id: '$colors.name' } }
-    ]),
-    
-    // Price Range
+    Product.distinct('productType', { isActive: true }),
     Product.aggregate([
       { $match: { isActive: true } },
       {
@@ -155,13 +152,50 @@ const getAvailableFilters = async () => {
 
   return {
     categories: categories.sort(),
+    subcategories: subcategories.sort(),
     brands: brands.sort(),
-    sportTypes: sportTypes.sort(),
-    sizes: sizes.sort(),
-    colors: colors.map(c => c._id).sort(),
+    productTypes: productTypes.sort(),
     priceRange: priceRange[0] || { minPrice: 0, maxPrice: 1000 }
   };
 };
+
+// @desc    Get products by category
+// @route   GET /api/products/category/:category
+// @access  Public
+router.get('/category/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    const { limit = 20, page = 1 } = req.query;
+
+    const products = await Product.find({ 
+      category: decodeURIComponent(category),
+      isActive: true 
+    })
+    .limit(limit * 1)
+    .skip((page - 1) * limit);
+
+    const total = await Product.countDocuments({ 
+      category: decodeURIComponent(category),
+      isActive: true 
+    });
+
+    res.json({
+      success: true,
+      data: products,
+      pagination: {
+        page: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+  } catch (error) {
+    console.error('Get products by category error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching products by category'
+    });
+  }
+});
 
 // @desc    Get single product
 // @route   GET /api/products/:id
@@ -177,6 +211,10 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    // Increment view count (optional - you can add this field)
+    // product.viewCount = (product.viewCount || 0) + 1;
+    // await product.save();
+
     res.json({
       success: true,
       data: product
@@ -191,7 +229,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // @desc    Get featured products
-// @route   GET /api/products/featured/products
+// @route   GET /api/products/featured
 // @access  Public
 router.get('/featured/products', async (req, res) => {
   try {
@@ -199,7 +237,6 @@ router.get('/featured/products', async (req, res) => {
       featured: true, 
       isActive: true 
     })
-    .select('-images.data')
     .limit(8)
     .sort({ createdAt: -1 });
 
@@ -212,6 +249,102 @@ router.get('/featured/products', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching featured products'
+    });
+  }
+});
+
+// @desc    Get new arrivals
+// @route   GET /api/products/new-arrivals
+// @access  Public
+router.get('/new-arrivals/limit', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 12;
+    const products = await Product.find({ isActive: true })
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    res.json({
+      success: true,
+      data: products
+    });
+  } catch (error) {
+    console.error('Get new arrivals error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching new arrivals'
+    });
+  }
+});
+
+// @desc    Get best selling products
+// @route   GET /api/products/best-selling
+// @access  Public
+router.get('/best-selling/limit', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 8;
+    // This would typically use order data to determine best sellers
+    // For now, return products with highest rating and review count
+    const products = await Product.find({ isActive: true })
+      .sort({ rating: -1, reviewCount: -1 })
+      .limit(limit);
+
+    res.json({
+      success: true,
+      data: products
+    });
+  } catch (error) {
+    console.error('Get best selling error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching best selling products'
+    });
+  }
+});
+
+// @desc    Search products
+// @route   GET /api/products/search/:query
+// @access  Public
+router.get('/search/:query', async (req, res) => {
+  try {
+    const { query } = req.params;
+    const { limit = 20, page = 1 } = req.query;
+
+    const products = await Product.find({
+      $or: [
+        { name: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } },
+        { brand: { $regex: query, $options: 'i' } },
+        { tags: { $in: [new RegExp(query, 'i')] } }
+      ],
+      isActive: true
+    })
+    .limit(limit * 1)
+    .skip((page - 1) * limit);
+
+    const total = await Product.countDocuments({
+      $or: [
+        { name: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } },
+        { brand: { $regex: query, $options: 'i' } }
+      ],
+      isActive: true
+    });
+
+    res.json({
+      success: true,
+      data: products,
+      pagination: {
+        page: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      },
+      query
+    });
+  } catch (error) {
+    console.error('Search products error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error searching products'
     });
   }
 });

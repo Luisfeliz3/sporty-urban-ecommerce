@@ -9,33 +9,32 @@ export const fetchProducts = createAsyncThunk(
         page = 1,
         limit = 25,
         category = '',
+        productType = '',
         brand = '',
-        sportType = '',
         minPrice = '',
         maxPrice = '',
-        size = '',
-        color = '',
         featured = '',
         sortBy = 'createdAt',
         sortOrder = 'desc',
-        search = ''
+        search = '',
+        inStock = '',
+        minRating = ''
       } = filters;
 
-      // Build query string
       const params = new URLSearchParams();
       if (page) params.append('page', page);
       if (limit) params.append('limit', limit);
       if (category) params.append('category', category);
+      if (productType) params.append('productType', productType);
       if (brand) params.append('brand', brand);
-      if (sportType) params.append('sportType', sportType);
       if (minPrice) params.append('minPrice', minPrice);
       if (maxPrice) params.append('maxPrice', maxPrice);
-      if (size) params.append('size', size);
-      if (color) params.append('color', color);
       if (featured) params.append('featured', featured);
       if (sortBy) params.append('sortBy', sortBy);
       if (sortOrder) params.append('sortOrder', sortOrder);
       if (search) params.append('search', search);
+      if (inStock) params.append('inStock', inStock);
+      if (minRating) params.append('minRating', minRating);
 
       const { data } = await API.get(`/products?${params.toString()}`);
       return data;
@@ -47,8 +46,36 @@ export const fetchProducts = createAsyncThunk(
 
 export const fetchProductDetails = createAsyncThunk(
   'products/fetchProductDetails',
-  async (productId) => {
-    const { data } = await API.get(`/products/${productId}`);
+  async (productId, { rejectWithValue }) => {
+    try {
+      const { data } = await API.get(`/products/${productId}`);
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch product details');
+    }
+  }
+);
+
+export const fetchFeaturedProducts = createAsyncThunk(
+  'products/fetchFeaturedProducts',
+  async (limit = 8) => {
+    const { data } = await API.get(`/products/featured/products?limit=${limit}`);
+    return data;
+  }
+);
+
+export const fetchNewArrivals = createAsyncThunk(
+  'products/fetchNewArrivals',
+  async (limit = 12) => {
+    const { data } = await API.get(`/products/new-arrivals/limit?limit=${limit}`);
+    return data;
+  }
+);
+
+export const fetchBestSelling = createAsyncThunk(
+  'products/fetchBestSelling',
+  async (limit = 8) => {
+    const { data } = await API.get(`/products/best-selling/limit?limit=${limit}`);
     return data;
   }
 );
@@ -58,27 +85,29 @@ const productSlice = createSlice({
   initialState: {
     products: [],
     product: null,
+    featuredProducts: [],
+    newArrivals: [],
+    bestSelling: [],
     loading: false,
     error: null,
     filters: {
       category: '',
+      productType: '',
       brand: '',
-      sportType: '',
       minPrice: '',
       maxPrice: '',
-      size: '',
-      color: '',
       featured: '',
       sortBy: 'createdAt',
       sortOrder: 'desc',
-      search: ''
+      search: '',
+      inStock: '',
+      minRating: '',
+      page: 1
     },
     availableFilters: {
       categories: [],
       brands: [],
-      sportTypes: [],
-      sizes: [],
-      colors: [],
+      productTypes: [],
       priceRange: { minPrice: 0, maxPrice: 1000 }
     },
     pagination: {
@@ -99,16 +128,17 @@ const productSlice = createSlice({
     resetFilters: (state) => {
       state.filters = {
         category: '',
+        productType: '',
         brand: '',
-        sportType: '',
         minPrice: '',
         maxPrice: '',
-        size: '',
-        color: '',
         featured: '',
         sortBy: 'createdAt',
         sortOrder: 'desc',
-        search: ''
+        search: '',
+        inStock: '',
+        minRating: '',
+        page: 1
       };
     },
     clearProductsError: (state) => {
@@ -125,7 +155,9 @@ const productSlice = createSlice({
         state.loading = false;
         state.products = action.payload.data;
         state.pagination = action.payload.pagination;
-        state.availableFilters = action.payload.filters;
+        if (action.payload.filters) {
+          state.availableFilters = action.payload.filters;
+        }
       })
       .addCase(fetchProducts.rejected, (state, action) => {
         state.loading = false;
@@ -140,7 +172,16 @@ const productSlice = createSlice({
       })
       .addCase(fetchProductDetails.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message;
+        state.error = action.payload;
+      })
+      .addCase(fetchFeaturedProducts.fulfilled, (state, action) => {
+        state.featuredProducts = action.payload.data;
+      })
+      .addCase(fetchNewArrivals.fulfilled, (state, action) => {
+        state.newArrivals = action.payload.data;
+      })
+      .addCase(fetchBestSelling.fulfilled, (state, action) => {
+        state.bestSelling = action.payload.data;
       });
   },
 });

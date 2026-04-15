@@ -22,18 +22,25 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  Drawer,
+  IconButton,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Search,
   FilterList,
   Clear,
   LocalOffer,
+  Close,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProducts, updateFilters, resetFilters } from '../store/slices/productSlice';
 import ProductCard from '../components/Product/ProductCard';
 
 const ProductsPage = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const dispatch = useDispatch();
   const { 
     products, 
@@ -45,7 +52,30 @@ const ProductsPage = () => {
   } = useSelector((state) => state.products);
 
   const [localFilters, setLocalFilters] = useState(filters);
-  const [showFilters, setShowFilters] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  // Updated categories for multi-category store
+  const categories = [
+    'Detergents & Laundry',
+    'Beauty & Personal Care',
+    'Home Care & Cleaning',
+    'Grocery & Staples',
+    'Health & Household',
+    'Home & Kitchen',
+    'Baby Care',
+    'Pet Care'
+  ];
+
+  const productTypes = [
+    { value: 'detergent', label: 'Detergents & Laundry' },
+    { value: 'beauty', label: 'Beauty & Personal Care' },
+    { value: 'homecare', label: 'Home Care & Cleaning' },
+    { value: 'grocery', label: 'Grocery & Staples' },
+    { value: 'health', label: 'Health & Household' },
+    { value: 'homekitchen', label: 'Home & Kitchen' },
+    { value: 'baby', label: 'Baby Care' },
+    { value: 'pet', label: 'Pet Care' }
+  ];
 
   // Sync local filters with Redux filters
   useEffect(() => {
@@ -61,33 +91,37 @@ const ProductsPage = () => {
     setLocalFilters(prev => ({
       ...prev,
       [key]: value,
-      page: 1 // Reset to first page when filters change
+      page: 1
     }));
   };
 
   const applyFilters = () => {
     dispatch(updateFilters(localFilters));
+    if (isMobile) {
+      setMobileFiltersOpen(false);
+    }
   };
 
   const handleResetFilters = () => {
     dispatch(resetFilters());
     setLocalFilters({
       category: '',
+      productType: '',
       brand: '',
-      sportType: '',
       minPrice: '',
       maxPrice: '',
-      size: '',
-      color: '',
       featured: '',
       sortBy: 'createdAt',
       sortOrder: 'desc',
-      search: ''
+      search: '',
+      inStock: '',
+      minRating: ''
     });
   };
 
   const handlePageChange = (event, value) => {
     dispatch(updateFilters({ ...filters, page: value }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSearch = (event) => {
@@ -104,14 +138,207 @@ const ProductsPage = () => {
     }));
   };
 
-  const activeFiltersCount = Object.values(filters).filter(
-    value => value && value !== '' && value !== 'createdAt' && value !== 'desc'
-  ).length - 1; // Subtract 1 for page field
+  const activeFiltersCount = Object.entries(filters).filter(
+    ([key, value]) => value && value !== '' && value !== 'all' && key !== 'sortBy' && key !== 'sortOrder' && key !== 'page'
+  ).length;
 
+  const FilterContent = () => (
+    <Box sx={{ p: isMobile ? 2 : 0 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h6">
+          <FilterList sx={{ mr: 1 }} />
+          Filters
+        </Typography>
+        {isMobile && (
+          <IconButton onClick={() => setMobileFiltersOpen(false)}>
+            <Close />
+          </IconButton>
+        )}
+      </Box>
 
+      {/* Search */}
+      <TextField
+        fullWidth
+        label="Search products"
+        value={localFilters.search}
+        onChange={(e) => handleFilterChange('search', e.target.value)}
+        onKeyPress={handleSearch}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Search />
+            </InputAdornment>
+          ),
+        }}
+        sx={{ mb: 3 }}
+      />
 
+      {/* Category Filter */}
+      <FormControl fullWidth sx={{ mb: 3 }}>
+        <InputLabel>Category</InputLabel>
+        <Select
+          value={localFilters.category}
+          label="Category"
+          onChange={(e) => handleFilterChange('category', e.target.value)}
+        >
+          <MenuItem value="">All Categories</MenuItem>
+          {categories.map(category => (
+            <MenuItem key={category} value={category}>
+              {category}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
 
-  
+      {/* Product Type Filter */}
+      <FormControl fullWidth sx={{ mb: 3 }}>
+        <InputLabel>Product Type</InputLabel>
+        <Select
+          value={localFilters.productType}
+          label="Product Type"
+          onChange={(e) => handleFilterChange('productType', e.target.value)}
+        >
+          <MenuItem value="">All Types</MenuItem>
+          {productTypes.map(type => (
+            <MenuItem key={type.value} value={type.value}>
+              {type.label}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      {/* Brand Filter */}
+      <FormControl fullWidth sx={{ mb: 3 }}>
+        <InputLabel>Brand</InputLabel>
+        <Select
+          value={localFilters.brand}
+          label="Brand"
+          onChange={(e) => handleFilterChange('brand', e.target.value)}
+        >
+          <MenuItem value="">All Brands</MenuItem>
+          {availableFilters.brands.map(brand => (
+            <MenuItem key={brand} value={brand}>
+              {brand}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      {/* Price Range Filter */}
+      <Box sx={{ mb: 3 }}>
+        <Typography gutterBottom>
+          Price Range
+        </Typography>
+        <Slider
+          value={[
+            localFilters.minPrice || availableFilters.priceRange?.minPrice || 0,
+            localFilters.maxPrice || availableFilters.priceRange?.maxPrice || 1000
+          ]}
+          onChange={handlePriceChange}
+          valueLabelDisplay="auto"
+          min={availableFilters.priceRange?.minPrice || 0}
+          max={availableFilters.priceRange?.maxPrice || 1000}
+          sx={{ mb: 2 }}
+        />
+        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Typography variant="body2">
+            ${localFilters.minPrice || availableFilters.priceRange?.minPrice || 0}
+          </Typography>
+          <Typography variant="body2">
+            ${localFilters.maxPrice || availableFilters.priceRange?.maxPrice || 1000}
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Rating Filter */}
+      <FormControl fullWidth sx={{ mb: 3 }}>
+        <InputLabel>Minimum Rating</InputLabel>
+        <Select
+          value={localFilters.minRating || ''}
+          label="Minimum Rating"
+          onChange={(e) => handleFilterChange('minRating', e.target.value)}
+        >
+          <MenuItem value="">Any Rating</MenuItem>
+          <MenuItem value="4">4★ & above</MenuItem>
+          <MenuItem value="3">3★ & above</MenuItem>
+          <MenuItem value="2">2★ & above</MenuItem>
+        </Select>
+      </FormControl>
+
+      {/* In Stock Filter */}
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={localFilters.inStock === 'true'}
+            onChange={(e) => handleFilterChange('inStock', e.target.checked ? 'true' : '')}
+          />
+        }
+        label="In Stock Only"
+        sx={{ mb: 2, display: 'block' }}
+      />
+
+      {/* Featured Filter */}
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={localFilters.featured === 'true'}
+            onChange={(e) => handleFilterChange('featured', e.target.checked ? 'true' : '')}
+          />
+        }
+        label="Featured Products Only"
+        sx={{ mb: 3, display: 'block' }}
+      />
+
+      <Divider sx={{ my: 2 }} />
+
+      {/* Sort Options */}
+      <FormControl fullWidth sx={{ mb: 2 }}>
+        <InputLabel>Sort By</InputLabel>
+        <Select
+          value={localFilters.sortBy}
+          label="Sort By"
+          onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+        >
+          <MenuItem value="createdAt">Newest</MenuItem>
+          <MenuItem value="price">Price</MenuItem>
+          <MenuItem value="name">Name</MenuItem>
+          <MenuItem value="rating">Rating</MenuItem>
+        </Select>
+      </FormControl>
+
+      <FormControl fullWidth sx={{ mb: 3 }}>
+        <InputLabel>Sort Order</InputLabel>
+        <Select
+          value={localFilters.sortOrder}
+          label="Sort Order"
+          onChange={(e) => handleFilterChange('sortOrder', e.target.value)}
+        >
+          <MenuItem value="desc">Descending</MenuItem>
+          <MenuItem value="asc">Ascending</MenuItem>
+        </Select>
+      </FormControl>
+
+      {/* Action Buttons */}
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Button
+          variant="outlined"
+          startIcon={<Clear />}
+          onClick={handleResetFilters}
+          fullWidth
+        >
+          Reset
+        </Button>
+        <Button
+          variant="contained"
+          onClick={applyFilters}
+          fullWidth
+        >
+          Apply
+        </Button>
+      </Box>
+    </Box>
+  );
+
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       {/* Header */}
@@ -120,7 +347,7 @@ const ProductsPage = () => {
           Shop All Products
         </Typography>
         <Typography variant="h6" color="text.secondary">
-          Discover our complete collection of Detergents and other cleaning agents and home care products.
+          Discover our complete collection of detergents, beauty products, home care items, groceries, health products, and home & kitchen essentials.
         </Typography>
       </Box>
 
@@ -131,280 +358,91 @@ const ProductsPage = () => {
       )}
 
       <Grid container spacing={3}>
-        {/* Filters Sidebar */}
-        <Grid item xs={12} md={3}>
-          <Paper elevation={2} sx={{ p: 3, position: 'sticky', top: 100 }}>
-            {/* Filters Header */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6" component="h2">
-                <FilterList sx={{ mr: 1 }} />
-                Filters
-              </Typography>
-              {activeFiltersCount > 0 && (
-                <Chip 
-                  label={`${activeFiltersCount} active`} 
-                  size="small" 
-                  color="primary" 
-                />
-              )}
-            </Box>
-
-            {/* Search */}
-            <TextField
-              fullWidth
-              label="Search products"
-              value={localFilters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              onKeyPress={handleSearch}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ mb: 3 }}
-            />
-
-            {/* Category Filter */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Category</InputLabel>
-              <Select
-                value={localFilters.category}
-                label="Category"
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-              >
-                <MenuItem value="all">All Categories</MenuItem>
-                {availableFilters.categories.map(category => (
-                  <MenuItem key={category} value={category}>
-                    {category}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Brand Filter */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Brand</InputLabel>
-              <Select
-                value={localFilters.brand}
-                label="Brand"
-                onChange={(e) => handleFilterChange('brand', e.target.value)}
-              >
-                <MenuItem value="all">All Brands</MenuItem>
-                {availableFilters.brands.map(brand => (
-                  <MenuItem key={brand} value={brand}>
-                    {brand}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Sport Type Filter */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Sport Type</InputLabel>
-              <Select
-                value={localFilters.sportType}
-                label="Sport Type"
-                onChange={(e) => handleFilterChange('sportType', e.target.value)}
-              >
-                <MenuItem value="all">All Sports</MenuItem>
-                {availableFilters.sportTypes.map(sport => (
-                  <MenuItem key={sport} value={sport}>
-                    {sport.charAt(0).toUpperCase() + sport.slice(1)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Price Range Filter */}
-            <Box sx={{ mb: 3 }}>
-              <Typography gutterBottom>
-                Price Range
-              </Typography>
-              <Slider
-                value={[
-                  parseInt(localFilters.minPrice) || availableFilters.priceRange.minPrice,
-                  parseInt(localFilters.maxPrice) || availableFilters.priceRange.maxPrice
-                ]}
-                onChange={handlePriceChange}
-                valueLabelDisplay="auto"
-                min={availableFilters.priceRange.minPrice}
-                max={availableFilters.priceRange.maxPrice}
-                sx={{ mb: 2 }}
-              />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2">
-                  ${parseInt(localFilters.minPrice) || availableFilters.priceRange.minPrice}
-                </Typography>
-                <Typography variant="body2">
-                  ${parseInt(localFilters.maxPrice) || availableFilters.priceRange.maxPrice}
-                </Typography>
-              </Box>
-            </Box>
-
-            {/* Size Filter */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Size</InputLabel>
-              <Select
-                value={localFilters.size}
-                label="Size"
-                onChange={(e) => handleFilterChange('size', e.target.value)}
-              >
-                <MenuItem value="all">All Sizes</MenuItem>
-                {availableFilters.sizes.map(size => (
-                  <MenuItem key={size} value={size}>
-                    {size}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Color Filter */}
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Color</InputLabel>
-              <Select
-                id="select_color"
-                value={localFilters.color}
-                label="Color"
-                onChange={(e) => handleFilterChange('color', e.target.value)}
-              >
-                <MenuItem value="all">All Colors</MenuItem>
-                {availableFilters.colors.map(color => (
-                  <MenuItem key={color} value={color}>
-                    {color}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Featured Filter */}
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={localFilters.featured === 'true'}
-                  onChange={(e) => handleFilterChange('featured', e.target.checked ? 'true' : '')}
-                />
-              }
-              label="Featured Products Only"
-            />
-
-            <Divider sx={{ my: 2 }} />
-
-            {/* Sort Options */}
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Sort By</InputLabel>
-              <Select
-                value={localFilters.sortBy}
-                label="Sort By"
-                onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-              >
-                <MenuItem value="createdAt">Newest</MenuItem>
-                <MenuItem value="price">Price</MenuItem>
-                <MenuItem value="name">Name</MenuItem>
-                <MenuItem value="rating">Rating</MenuItem>
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>Sort Order</InputLabel>
-              <Select
-                id="sort_order"
-                value={localFilters.sortOrder}
-                label="Sort Order"
-                onChange={(e) => handleFilterChange('sortOrder', e.target.value)}
-              >
-                <MenuItem value="desc">Descending</MenuItem>
-                <MenuItem value="asc">Ascending</MenuItem>
-              </Select>
-            </FormControl>
-
-            {/* Action Buttons */}
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                startIcon={<Clear />}
-                onClick={handleResetFilters}
-                fullWidth
-              >
-                Reset
-              </Button>
-              <Button
-                id="apply_button"
-                variant="contained"
-                onClick={applyFilters}
-                fullWidth
-              >
-                Apply
-              </Button>
-            </Box>
-          </Paper>
-        </Grid>
+        {/* Filters Sidebar - Desktop */}
+        {!isMobile && (
+          <Grid item xs={12} md={3}>
+            <Paper elevation={2} sx={{ p: 3, position: 'sticky', top: 100 }}>
+              <FilterContent />
+            </Paper>
+          </Grid>
+        )}
 
         {/* Products Grid */}
         <Grid item xs={12} md={9}>
           {/* Results Header */}
           <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6">
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 {loading ? (
                   <CircularProgress size={20} sx={{ mr: 1 }} />
                 ) : (
                   <LocalOffer sx={{ mr: 1 }} />
                 )}
-                {pagination.total} Products Found
-              </Typography>
+                <Typography variant="h6">
+                  {pagination.total} Products Found
+                </Typography>
+              </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {isMobile && (
                 <Button
                   variant="outlined"
-                  onClick={() => setShowFilters(!showFilters)}
-                  sx={{ display: { md: 'none' } }}
+                  startIcon={<FilterList />}
+                  onClick={() => setMobileFiltersOpen(true)}
                 >
-                  <FilterList /> Filters
+                  Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
                 </Button>
-              </Box>
+              )}
             </Box>
 
             {/* Active Filters */}
             {activeFiltersCount > 0 && (
               <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {filters.category && filters.category !== 'all' && (
+                {filters.category && (
                   <Chip 
                     label={`Category: ${filters.category}`}
                     onDelete={() => handleFilterChange('category', '')}
                     size="small"
                   />
                 )}
-                {filters.brand && filters.brand !== 'all' && (
+                {filters.productType && (
+                  <Chip 
+                    label={`Type: ${productTypes.find(t => t.value === filters.productType)?.label || filters.productType}`}
+                    onDelete={() => handleFilterChange('productType', '')}
+                    size="small"
+                  />
+                )}
+                {filters.brand && (
                   <Chip 
                     label={`Brand: ${filters.brand}`}
                     onDelete={() => handleFilterChange('brand', '')}
                     size="small"
                   />
                 )}
-                {filters.sportType && filters.sportType !== 'all' && (
+                {(filters.minPrice || filters.maxPrice) && (
                   <Chip 
-                    label={`Sport: ${filters.sportType}`}
-                    onDelete={() => handleFilterChange('sportType', '')}
+                    label={`Price: $${filters.minPrice || 0} - $${filters.maxPrice || '∞'}`}
+                    onDelete={() => {
+                      handleFilterChange('minPrice', '');
+                      handleFilterChange('maxPrice', '');
+                    }}
                     size="small"
                   />
                 )}
-                {filters.size && filters.size !== 'all' && (
+                {filters.minRating && (
                   <Chip 
-                    label={`Size: ${filters.size}`}
-                    onDelete={() => handleFilterChange('size', '')}
+                    label={`${filters.minRating}★ & above`}
+                    onDelete={() => handleFilterChange('minRating', '')}
                     size="small"
                   />
                 )}
-                {filters.color && filters.color !== 'all' && (
+                {filters.inStock === 'true' && (
                   <Chip 
-                    label={`Color: ${filters.color}`}
-                    onDelete={() => handleFilterChange('color', '')}
+                    label="In Stock Only"
+                    onDelete={() => handleFilterChange('inStock', '')}
                     size="small"
                   />
                 )}
-                {filters.featured && (
+                {filters.featured === 'true' && (
                   <Chip 
                     label="Featured"
                     onDelete={() => handleFilterChange('featured', '')}
@@ -459,7 +497,7 @@ const ProductsPage = () => {
                     page={pagination.page}
                     onChange={handlePageChange}
                     color="primary"
-                    size="large"
+                    size={isMobile ? "medium" : "large"}
                     showFirstButton
                     showLastButton
                   />
@@ -470,28 +508,17 @@ const ProductsPage = () => {
         </Grid>
       </Grid>
 
-      {/* Mobile Filters Dialog */}
-      {showFilters && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: 'background.paper',
-            zIndex: 1300,
-            p: 3,
-            overflow: 'auto'
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6">Filters</Typography>
-            <Button onClick={() => setShowFilters(false)}>Close</Button>
-          </Box>
-          {/* You can duplicate the filter content here for mobile */}
+      {/* Mobile Filters Drawer */}
+      <Drawer
+        anchor="bottom"
+        open={mobileFiltersOpen}
+        onClose={() => setMobileFiltersOpen(false)}
+        PaperProps={{ sx: { height: '85%', borderRadius: '16px 16px 0 0' } }}
+      >
+        <Box sx={{ overflow: 'auto', p: 2 }}>
+          <FilterContent />
         </Box>
-      )}
+      </Drawer>
     </Container>
   );
 };

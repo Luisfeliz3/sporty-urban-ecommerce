@@ -70,7 +70,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/profile', profileRoutes);
-// app.use('/api/upload', uploadRoutes);
+app.use('/api/upload', uploadRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/admin/products', adminProductRoutes);
 app.use('/api/stripe', stripeRoutes);
@@ -78,6 +78,11 @@ app.use('/api/stripe', stripeRoutes);
 // Add this with your other route declarations
 app.use('/api/admin/upload', uploadRoutes);
 
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Also serve from the root uploads if needed
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check route
 app.get('/api/health', (req, res) => {
