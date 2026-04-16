@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   AppBar,
   Toolbar,
@@ -11,17 +11,22 @@ import {
   Menu,
   MenuItem,
   InputBase,
+  Divider,
 } from "@mui/material";
 import {
   Search,
   ShoppingCart,
   Person,
   SportsBasketball,
+  History,
+  Dashboard,
 } from "@mui/icons-material";
 import { styled, alpha } from "@mui/material/styles";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../../store/slices/authSlice";
+
+
 
 const SearchContainer = styled("div")(({ theme }) => ({
   position: "relative",
@@ -62,6 +67,8 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }));
 
+
+
 const Header = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const { userInfo } = useSelector((state) => state.auth);
@@ -87,6 +94,21 @@ const Header = () => {
     handleMenuClose();
     navigate("/");
   };
+// In Header.js, add a useEffect to listen for cart clearing events
+useEffect(() => {
+  const handleCartCleared = () => {
+    console.log('Cart cleared event received in header');
+    // Force a re-render by accessing the state
+    const currentCart = cartItems;
+  };
+  
+  window.addEventListener('cartCleared', handleCartCleared);
+  
+  return () => {
+    window.removeEventListener('cartCleared', handleCartCleared);
+  };
+}, [cartItems]);
+  
 
   return (
     <AppBar position="sticky" sx={{ bgcolor: "secondary.main" }}>
@@ -107,9 +129,10 @@ const Header = () => {
             EM WHOLESALES
           </Typography>
  
-<Button color="inherit" component={Link} to="/products">
-  Shop All
-</Button>
+          <Button color="inherit" component={Link} to="/products">
+            Shop All
+          </Button>
+          
           {/* <SearchContainer>
             <SearchIconWrapper>
               <Search />
@@ -136,20 +159,51 @@ const Header = () => {
                   anchorEl={anchorEl}
                   open={Boolean(anchorEl)}
                   onClose={handleMenuClose}
+                  anchorOrigin={{
+                    vertical: 'bottom',
+                    horizontal: 'right',
+                  }}
+                  transformOrigin={{
+                    vertical: 'top',
+                    horizontal: 'right',
+                  }}
                 >
-                  {userInfo?.isAdmin && (
-  <MenuItem onClick={handleMenuClose} component={Link} to="/admin">
-    Admin Dashboard
-  </MenuItem>
-)}
-                  <MenuItem
-                    onClick={handleMenuClose}
-                    component={Link}
+                  <MenuItem 
+                    onClick={handleMenuClose} 
+                    component={Link} 
                     to="/profile"
                   >
+                    <Person fontSize="small" sx={{ mr: 1 }} />
                     My Profile
                   </MenuItem>
-                  <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                  
+                  <MenuItem 
+                    onClick={handleMenuClose} 
+                    component={Link} 
+                    to="/orders"
+                  >
+                    <History fontSize="small" sx={{ mr: 1 }} />
+                    Order History
+                  </MenuItem>
+                  
+                  {userInfo?.isAdmin && (
+                    <>
+                      <Divider />
+                      <MenuItem 
+                        onClick={handleMenuClose} 
+                        component={Link} 
+                        to="/admin"
+                      >
+                        <Dashboard fontSize="small" sx={{ mr: 1 }} />
+                        Admin Dashboard
+                      </MenuItem>
+                    </>
+                  )}
+                  
+                  <Divider />
+                  <MenuItem onClick={handleLogout}>
+                    Logout
+                  </MenuItem>
                 </Menu>
               </>
             ) : (

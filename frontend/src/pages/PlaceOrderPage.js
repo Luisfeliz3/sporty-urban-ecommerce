@@ -21,7 +21,7 @@ import { createOrder } from '../store/slices/orderSlice';
 import { createPaymentIntent } from '../store/slices/stripeSlice';
 import { clearCartLocal } from '../store/slices/cartSlice';
 import StripePayment from '../components/Payments/StripePayment';
-import defaultTshirt from "../components/Product/defaultTshirt.png";
+import no_img_avl from "../images/no_images.jpeg";
 
 const steps = ['Shipping', 'Payment', 'Place Order'];
 
@@ -44,7 +44,7 @@ const PlaceOrderPage = () => {
   const shippingPrice = itemsPrice > 50 ? 0 : 10;
   const totalPrice = itemsPrice + taxPrice + shippingPrice;
 
-// In PlaceOrderPage.js, update the placeOrderHandler
+// Update the placeOrderHandler for non-Stripe payments
 const placeOrderHandler = async () => {
   if (!userInfo) {
     navigate('/login?redirect=placeorder');
@@ -94,7 +94,6 @@ const placeOrderHandler = async () => {
     const result = await dispatch(createOrder(orderData)).unwrap();
     
     // The result should contain the order object
-    // Based on your API, it might be result.data or just result
     const newOrder = result.data || result;
     setCreatedOrder(newOrder);
     
@@ -109,9 +108,10 @@ const placeOrderHandler = async () => {
       // Show Stripe payment modal
       setShowStripePayment(true);
     } else {
-      // For other payment methods (like Cash on Delivery, Bank Transfer, etc.)
+      // For other payment methods, clear cart immediately
       dispatch(clearCartLocal());
-      navigate(`/order/${newOrder._id}`);
+      localStorage.removeItem('cartItems');
+      navigate(`/orderconfirmation/${newOrder._id}`);
     }
   } catch (error) {
     console.error('Order creation error:', error);
@@ -158,15 +158,22 @@ useEffect(() => {
     }
   }, [success, order, showStripePayment, paymentMethod, navigate, dispatch]);
 
-// In PlaceOrderPage.js, update the handlePaymentSuccess function
+// Update the handlePaymentSuccess function
 const handlePaymentSuccess = (paidOrder) => {
   console.log('✅ Payment successful for order:', paidOrder._id);
   setShowStripePayment(false);
+  
+  // Clear cart from Redux
   dispatch(clearCartLocal());
-  // Clear cart from localStorage as well
-  localStorage.removeItem('cart');
+  
+  // Clear cart from localStorage
+  localStorage.removeItem('cartItems');
+  
+  // Clear shipping address from localStorage (optional)
+  // localStorage.removeItem('shippingAddress');
+  
   // Navigate to order confirmation page
-  navigate(`/order/${paidOrder._id}`);
+  navigate(`/orderconfirmation/${paidOrder._id}`);
 };
 
 
@@ -272,7 +279,7 @@ const handlePaymentSuccess = (paidOrder) => {
                 <Box key={`${item.product}-${item.size}-${item.color}`}>
                   <Box sx={{ display: 'flex', alignItems: 'center', py: 2 }}>
                     <img
-                      src={item.image || defaultTshirt}
+                      src={item.image || no_img_avl}
                       alt={item.name}
                       style={{
                         width: 60,
@@ -282,7 +289,7 @@ const handlePaymentSuccess = (paidOrder) => {
                         marginRight: 16,
                       }}
                       onError={(e) => {
-                        e.target.src = defaultTshirt;
+                        e.target.src = no_img_avl;
                       }}
                     />
                     <Box sx={{ flex: 1 }}>

@@ -141,6 +141,8 @@ const ProfilePage = () => {
     });
   };
 
+  
+
   const handleAddPayment = (e) => {
     e.preventDefault();
     

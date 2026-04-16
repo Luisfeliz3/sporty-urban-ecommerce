@@ -6,6 +6,114 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const router = express.Router();
 
+// IMPORTANT: Specific routes MUST come before parameterized routes
+// Order: /myorders, / (admin), then /:id, etc.
+
+// @desc    Get logged in user orders (SPECIFIC ROUTE - MUST COME FIRST)
+// @route   GET /api/orders/myorders
+// @access  Private
+router.get('/myorders', auth, async (req, res) => {
+  try {
+    console.log('📦 Fetching orders for user:', req.user._id);
+    
+    const orders = await Order.find({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate('orderItems.product', 'name images price');
+
+    console.log(`✅ Found ${orders.length} orders for user`);
+    
+    res.json({
+      success: true,
+      data: orders,
+      count: orders.length
+    });
+  } catch (error) {
+    console.error('Get user orders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user orders: ' + error.message
+    });
+  }
+});
+
+// @desc    Get all orders (Admin) - SPECIFIC ROUTE
+// @route   GET /api/orders
+// @access  Private/Admin
+router.get('/', auth, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    const orders = await Order.find({})
+      .populate('user', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: orders,
+      count: orders.length
+    });
+  } catch (error) {
+    console.error('Get all orders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching orders'
+    });
+  }
+});
+
+// @desc    Get order by ID (PARAMETERIZED ROUTE - COMES AFTER SPECIFIC ROUTES)
+// @route   GET /api/orders/:id
+// @access  Private
+router.get('/:id', auth, async (req, res) => {
+  try {
+    console.log('🔍 Fetching order by ID:', req.params.id);
+    
+    // Validate if the ID is a valid MongoDB ObjectId
+    const isValidObjectId = require('mongoose').Types.ObjectId.isValid;
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order ID format'
+      });
+    }
+    
+    const order = await Order.findById(req.params.id)
+      .populate('user', 'name email')
+      .populate('orderItems.product', 'name images price');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Check if user owns the order or is admin
+    if (order.user._id.toString() !== req.user._id.toString() && !req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this order'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    console.error('Get order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching order: ' + error.message
+    });
+  }
+});
+
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
@@ -23,24 +131,6 @@ router.post('/', auth, async (req, res) => {
       shippingPrice,
       totalPrice,
     } = req.body;
-
-    // REMOVE THIS BLOCK - It's causing the error
-    // This code doesn't belong here and stripe is not defined
-    /*
-    if (!req.user.stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: req.user.email,
-        name: req.user.name,
-        metadata: {
-          userId: req.user._id.toString()
-        }
-      });
-      
-      await User.findByIdAndUpdate(req.user._id, {
-        stripeCustomerId: customer.id
-      });
-    }
-    */
 
     // Validation
     if (!orderItems || orderItems.length === 0) {
@@ -122,43 +212,6 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// @desc    Get order by ID
-// @route   GET /api/orders/:id
-// @access  Private
-router.get('/:id', auth, async (req, res) => {
-  try {
-    const order = await Order.findById(req.params.id)
-      .populate('user', 'name email')
-      .populate('orderItems.product', 'name images price');
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found'
-      });
-    }
-
-    // Check if user owns the order or is admin
-    if (order.user._id.toString() !== req.user._id.toString() && !req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this order'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: order
-    });
-  } catch (error) {
-    console.error('Get order error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching order'
-    });
-  }
-});
-
 // @desc    Update order to paid
 // @route   PUT /api/orders/:id/pay
 // @access  Private
@@ -202,76 +255,6 @@ router.put('/:id/pay', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating order payment status'
-    });
-  }
-});
-
-// @desc    Get logged in user orders
-// @route   GET /api/orders/myorders
-// @access  Private
-router.get('/myorders', auth, async (req, res) => {
-  try {
-    const orders = await Order.find({ user: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('orderItems.product', 'name images');
-
-    res.json({
-      success: true,
-      data: orders,
-      count: orders.length
-    });
-  } catch (error) {
-    console.error('Get user orders error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching user orders'
-    });
-  }
-});
-
-// @desc    Get all orders (Admin)
-// @route   GET /api/orders
-// @access  Private/Admin
-router.get('/', auth, async (req, res) => {
-  try {
-    if (!req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Admin access required'
-      });
-    }
-
-    // REMOVE THIS BLOCK AS WELL - It's also causing the error
-    /*
-    if (!req.user.stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: req.user.email,
-        name: req.user.name,
-        metadata: {
-          userId: req.user._id.toString()
-        }
-      });
-      
-      await User.findByIdAndUpdate(req.user._id, {
-        stripeCustomerId: customer.id
-      });
-    }
-    */
-
-    const orders = await Order.find({})
-      .populate('user', 'name email')
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      data: orders,
-      count: orders.length
-    });
-  } catch (error) {
-    console.error('Get all orders error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching orders'
     });
   }
 });

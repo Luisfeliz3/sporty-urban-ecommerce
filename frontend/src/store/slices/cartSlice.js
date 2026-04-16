@@ -25,7 +25,7 @@ const mergeCartItems = (items) => {
         product: item.product,
         name: item.name || 'Product',
         price: Number(item.price) || 0,
-        image: typeof item.image === 'string' ? item.image : (item.image?.url || '/images/placeholder.jpg'),
+        image: typeof item.image === 'string' ? item.image : (item.image?.url || '../../images/no_images.jpeg'),
         size: item.size || 'N/A',
         color: item.color || 'N/A',
         quantity: Number(item.quantity) || 0,
@@ -225,11 +225,14 @@ const cartSlice = createSlice({
       }
     },
     
-    clearCartLocal: (state) => {
-      state.cartItems = [];
-      localStorage.removeItem('cartItems');
-    },
-    
+clearCartLocal: (state) => {
+  state.cartItems = [];
+  state.shippingAddress = {};
+  state.paymentMethod = 'Credit Card';
+  localStorage.removeItem('cartItems');
+  localStorage.removeItem('shippingAddress');
+  console.log('Cart completely cleared');
+},
     saveShippingAddress: (state, action) => {
       state.shippingAddress = action.payload;
       localStorage.setItem('shippingAddress', JSON.stringify(state.shippingAddress));

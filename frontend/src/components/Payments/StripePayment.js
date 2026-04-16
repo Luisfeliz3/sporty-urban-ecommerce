@@ -24,10 +24,12 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import AppleIcon from '@mui/icons-material/Apple';
 import GoogleIcon from '@mui/icons-material/Google';
-import { Elements, PaymentElement, useStripe, useElements, PaymentRequestButtonElement } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { confirmPayment } from '../../store/slices/stripeSlice';
+import { clearCartLocal } from '../../store/slices/cartSlice';
 
 let stripePromise;
 const getStripePromise = () => {
@@ -38,108 +40,82 @@ const getStripePromise = () => {
 };
 
 // Component for new card payment
-const NewCardPaymentForm = ({ order, onSuccess, onClose, clientSecret, setPaymentComplete }) => {
+const NewCardPaymentForm = ({ order, onSuccess, onClose, clientSecret, setPaymentComplete, setError }) => {
   const stripe = useStripe();
   const elements = useElements();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isReady, setIsReady] = useState(false);
+  const [localError, setLocalError] = useState('');
 
-  useEffect(() => {
-    if (stripe && elements) {
-      setIsReady(true);
-    }
-  }, [stripe, elements]);
-const ExpressCheckoutButton = ({ amount, onSuccess }) => {
-  const stripe = useStripe();
-  const [paymentRequest, setPaymentRequest] = useState(null);
+// In NewCardPaymentForm component - update the handleSubmit function
+const handleSubmit = async (event) => {
+  event.preventDefault();
+  
+  if (!stripe || !elements) {
+    setLocalError('Payment system is not ready. Please wait.');
+    return;
+  }
 
-  useEffect(() => {
-    if (!stripe) return;
+  setLoading(true);
+  setLocalError('');
 
-    const pr = stripe.paymentRequest({
-      country: 'US',
-      currency: 'usd',
-      total: {
-        label: 'Total',
-        amount: Math.round(amount * 100),
-      },
-      requestPayerName: true,
-      requestPayerEmail: true,
-    });
-
-    // Check if Apple Pay/Google Pay is available
-    pr.canMakePayment().then(result => {
-      if (result) {
-        setPaymentRequest(pr);
-      }
-    });
-
-    pr.on('paymentmethod', async (ev) => {
-      // Handle the payment completion here
-      // Similar to your existing payment flow
-      onSuccess(ev);
-    });
-  }, [stripe, amount]);
-
-  if (!paymentRequest) return null;
-
-  return <PaymentRequestButtonElement options={{ paymentRequest }} />;
-};
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    
-    if (!stripe || !elements) {
-      setError('Payment system is not ready. Please wait.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const { error: submitError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/order/${order._id}`,
-          payment_method_data: {
-            billing_details: {
-              name: order.user?.name || '',
-              email: order.user?.email || '',
-            }
+  try {
+    const { error: submitError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/orderconfirmation/${order._id}`,
+        payment_method_data: {
+          billing_details: {
+            name: order.user?.name || '',
+            email: order.user?.email || '',
           }
-        },
-        redirect: 'if_required',
-      });
-
-      if (submitError) {
-        setError(submitError.message);
-        setLoading(false);
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Confirm payment on backend
-        const result = await dispatch(confirmPayment({
-          orderId: order._id,
-          paymentIntentId: paymentIntent.id
-        })).unwrap();
-        
-        if (result.success) {
-          setPaymentComplete(true);
-          setTimeout(() => {
-            onSuccess(order);
-          }, 1500);
-        } else {
-          setError('Payment confirmation failed. Please contact support.');
-          setLoading(false);
         }
-      }
-    } catch (err) {
-      console.error('Payment exception:', err);
-      setError(err.message || 'An error occurred during payment');
+      },
+      redirect: 'if_required',
+    });
+
+    if (submitError) {
+      setLocalError(submitError.message);
+      if (setError) setError(submitError.message);
       setLoading(false);
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      // Confirm payment on backend
+      const result = await dispatch(confirmPayment({
+        orderId: order._id,
+        paymentIntentId: paymentIntent.id
+      })).unwrap();
+      
+      if (result.success) {
+        // Clear cart from Redux
+        dispatch(clearCartLocal());
+        
+        // Clear cart from localStorage
+        localStorage.removeItem('cartItems');
+        
+        // Also clear shipping address if you want
+        // localStorage.removeItem('shippingAddress');
+        
+        setPaymentComplete(true);
+        
+        // Navigate to order confirmation page
+        setTimeout(() => {
+          navigate(`/orderconfirmation/${order._id}`);
+        }, 1500);
+      } else {
+        setLocalError('Payment confirmation failed. Please contact support.');
+        if (setError) setError('Payment confirmation failed. Please contact support.');
+        setLoading(false);
+      }
     }
-  };
+  } catch (err) {
+    console.error('Payment exception:', err);
+    setLocalError(err.message || 'An error occurred during payment');
+    if (setError) setError(err.message || 'An error occurred during payment');
+    setLoading(false);
+  }
+};
 
   return (
     <form onSubmit={handleSubmit}>
@@ -150,18 +126,18 @@ const ExpressCheckoutButton = ({ amount, onSuccess }) => {
         <PaymentElement 
           onReady={() => {
             console.log('Payment element ready');
-            setIsReady(true);
           }}
           onError={(error) => {
             console.error('Payment element error:', error);
-            setError(error.message);
+            setLocalError(error.message);
+            if (setError) setError(error.message);
           }}
         />
       </Box>
       
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
+      {localError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError('')}>
+          {localError}
         </Alert>
       )}
       
@@ -172,7 +148,7 @@ const ExpressCheckoutButton = ({ amount, onSuccess }) => {
         <Button 
           type="submit" 
           variant="contained" 
-          disabled={!stripe || !isReady || loading || !clientSecret}
+          disabled={!stripe || loading || !clientSecret}
           sx={{ minWidth: 160 }}
         >
           {loading ? <CircularProgress size={24} /> : `Pay $${order?.totalPrice?.toFixed(2)}`}
@@ -183,20 +159,22 @@ const ExpressCheckoutButton = ({ amount, onSuccess }) => {
 };
 
 // Component for saved cards
-const SavedCardPayment = ({ order, onSuccess, onClose, savedCards, onUseNewCard, setPaymentComplete }) => {
+const SavedCardPayment = ({ order, onSuccess, onClose, savedCards, onUseNewCard, setPaymentComplete, setError }) => {
   const [selectedCard, setSelectedCard] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
   const { userInfo } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const handlePayment = async () => {
     if (!selectedCard) {
-      setError('Please select a payment method');
+      setLocalError('Please select a payment method');
       return;
     }
 
     setLoading(true);
-    setError('');
+    setLocalError('');
 
     try {
       console.log('Processing payment with saved card:', selectedCard);
@@ -218,16 +196,22 @@ const SavedCardPayment = ({ order, onSuccess, onClose, savedCards, onUseNewCard,
 
       if (data.success && data.paymentIntent.status === 'succeeded') {
         setPaymentComplete(true);
+        // Clear cart
+        dispatch(clearCartLocal());
+        localStorage.removeItem('cartItems');
+        // Navigate to order confirmation page
         setTimeout(() => {
-          onSuccess(order);
+          navigate(`/orderconfirmation/${order._id}`);
         }, 1500);
       } else {
-        setError(data.message || 'Payment failed. Please try again or use a different card.');
+        setLocalError(data.message || 'Payment failed. Please try again or use a different card.');
+        if (setError) setError(data.message || 'Payment failed. Please try again or use a different card.');
         setLoading(false);
       }
     } catch (err) {
       console.error('Payment error:', err);
-      setError(err.message || 'An error occurred');
+      setLocalError(err.message || 'An error occurred');
+      if (setError) setError(err.message || 'An error occurred');
       setLoading(false);
     }
   };
@@ -274,9 +258,9 @@ const SavedCardPayment = ({ order, onSuccess, onClose, savedCards, onUseNewCard,
         Use New Card
       </Button>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
+      {localError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setLocalError('')}>
+          {localError}
         </Alert>
       )}
 
@@ -307,6 +291,7 @@ const StripePayment = ({ open, onClose, order, onSuccess }) => {
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [loadingSavedCards, setLoadingSavedCards] = useState(false);
   const { userInfo } = useSelector((state) => state.auth);
+  const navigate = useNavigate();
 
   // Initialize Stripe
   useEffect(() => {
@@ -408,6 +393,12 @@ const StripePayment = ({ open, onClose, order, onSuccess }) => {
     setClientSecret(null);
   };
 
+  const handleClose = () => {
+    if (!paymentComplete) {
+      onClose();
+    }
+  };
+
   const appearance = {
     theme: 'stripe',
     variables: {
@@ -449,7 +440,7 @@ const StripePayment = ({ open, onClose, order, onSuccess }) => {
   return (
     <Dialog 
       open={open} 
-      onClose={onClose} 
+      onClose={handleClose} 
       maxWidth="md" 
       fullWidth
       PaperProps={{
@@ -459,7 +450,7 @@ const StripePayment = ({ open, onClose, order, onSuccess }) => {
       <DialogTitle sx={{ pb: 1, borderBottom: '1px solid #e5e7eb' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">Secure Checkout</Typography>
-          <IconButton onClick={onClose} size="small">
+          <IconButton onClick={handleClose} size="small">
             <CloseIcon />
           </IconButton>
         </Box>
@@ -541,10 +532,6 @@ const StripePayment = ({ open, onClose, order, onSuccess }) => {
               <AccountBalanceIcon fontSize="small" />
               <Typography variant="body2">Bank Accounts (ACH)</Typography>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <AccountBalanceIcon fontSize="small" />
-              <Typography variant="body2">💚 Klarna (Buy Now, Pay Later)</Typography>
-            </Box>
           </Box>
         </Paper>
 
@@ -574,19 +561,21 @@ const StripePayment = ({ open, onClose, order, onSuccess }) => {
               <SavedCardPayment
                 order={order}
                 onSuccess={onSuccess}
-                onClose={onClose}
+                onClose={handleClose}
                 savedCards={savedCards}
                 onUseNewCard={handleUseNewCard}
                 setPaymentComplete={setPaymentComplete}
+                setError={setError}
               />
             ) : !useSavedCard && clientSecret && stripePromiseState ? (
               <Elements stripe={stripePromiseState} options={options}>
                 <NewCardPaymentForm
                   order={order}
                   onSuccess={onSuccess}
-                  onClose={onClose}
+                  onClose={handleClose}
                   clientSecret={clientSecret}
                   setPaymentComplete={setPaymentComplete}
+                  setError={setError}
                 />
               </Elements>
             ) : !useSavedCard && !clientSecret && !loading && (

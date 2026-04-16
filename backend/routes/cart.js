@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Product = require('../models/Product');
 const auth = require('../middleware/auth');
 const router = express.Router();
+ 
 
 // Helper function to enhance cart items with product details
 const enhanceCartItems = async (cartItems) => {
@@ -18,7 +19,7 @@ const enhanceCartItems = async (cartItems) => {
           product: item.product,
           name: product.name,
           price: Number(product.price),
-          image: product.images?.[0]?.url || '/images/placeholder.jpg',
+          image: product.images?.[0]?.url || no_img_avl,
           quantity: Number(item.quantity),
           size: item.size,
           color: item.color,

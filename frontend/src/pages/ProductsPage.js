@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Container,
   Grid,
@@ -53,6 +53,8 @@ const ProductsPage = () => {
 
   const [localFilters, setLocalFilters] = useState(filters);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState(filters.search || '');
+  const searchTimeoutRef = useRef(null);
 
   // Updated categories for multi-category store
   const categories = [
@@ -77,72 +79,88 @@ const ProductsPage = () => {
     { value: 'pet', label: 'Pet Care' }
   ];
 
-  // Sync local filters with Redux filters
-  useEffect(() => {
-    setLocalFilters(filters);
-  }, [filters]);
-
   // Fetch products when filters change
   useEffect(() => {
     dispatch(fetchProducts(filters));
   }, [dispatch, filters]);
 
-  const handleFilterChange = (key, value) => {
-    setLocalFilters(prev => ({
-      ...prev,
-      [key]: value,
-      page: 1
-    }));
-  };
-
-  const applyFilters = () => {
-    dispatch(updateFilters(localFilters));
-    if (isMobile) {
-      setMobileFiltersOpen(false);
+  // Debounced search function
+  const debouncedSearch = useCallback((value) => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
-  };
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      dispatch(updateFilters({ 
+        ...filters, 
+        search: value,
+        page: 1 
+      }));
+    }, 500);
+  }, [dispatch, filters]);
 
-  const handleResetFilters = () => {
-    dispatch(resetFilters());
-    setLocalFilters({
-      category: '',
-      productType: '',
-      brand: '',
-      minPrice: '',
-      maxPrice: '',
-      featured: '',
-      sortBy: 'createdAt',
-      sortOrder: 'desc',
+  // Handle search input change - maintains focus
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    setSearchValue(value);
+    debouncedSearch(value);
+  }, [debouncedSearch]);
+
+  // Clear search
+  const handleClearSearch = useCallback(() => {
+    setSearchValue('');
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    dispatch(updateFilters({ 
+      ...filters, 
       search: '',
-      inStock: '',
-      minRating: ''
-    });
-  };
+      page: 1 
+    }));
+  }, [dispatch, filters]);
 
-  const handlePageChange = (event, value) => {
+  // Handle immediate filter changes (non-search)
+  const handleImmediateFilterChange = useCallback((key, value) => {
+    const newFilters = { ...filters, [key]: value, page: 1 };
+    dispatch(updateFilters(newFilters));
+  }, [dispatch, filters]);
+
+  const handleResetFilters = useCallback(() => {
+    setSearchValue('');
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    dispatch(resetFilters());
+  }, [dispatch]);
+
+  const handlePageChange = useCallback((event, value) => {
     dispatch(updateFilters({ ...filters, page: value }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [dispatch, filters]);
 
-  const handleSearch = (event) => {
-    if (event.key === 'Enter') {
-      applyFilters();
-    }
-  };
-
-  const handlePriceChange = (event, newValue) => {
+  const handlePriceChange = useCallback((event, newValue) => {
     setLocalFilters(prev => ({
       ...prev,
       minPrice: newValue[0],
       maxPrice: newValue[1]
     }));
-  };
+  }, []);
+
+  const handlePriceChangeComplete = useCallback(() => {
+    dispatch(updateFilters({ 
+      ...filters, 
+      minPrice: localFilters.minPrice,
+      maxPrice: localFilters.maxPrice,
+      page: 1 
+    }));
+  }, [dispatch, filters, localFilters.minPrice, localFilters.maxPrice]);
 
   const activeFiltersCount = Object.entries(filters).filter(
     ([key, value]) => value && value !== '' && value !== 'all' && key !== 'sortBy' && key !== 'sortOrder' && key !== 'page'
   ).length;
 
-  const FilterContent = () => (
+  // Memoize FilterContent to prevent re-renders
+  const FilterContent = useMemo(() => (
     <Box sx={{ p: isMobile ? 2 : 0 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h6">
@@ -156,30 +174,43 @@ const ProductsPage = () => {
         )}
       </Box>
 
-      {/* Search */}
+      {/* Search Field - FIXED: Maintains focus now */}
       <TextField
         fullWidth
         label="Search products"
-        value={localFilters.search}
-        onChange={(e) => handleFilterChange('search', e.target.value)}
-        onKeyPress={handleSearch}
+        value={searchValue}
+        onChange={handleSearchChange}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
               <Search />
             </InputAdornment>
           ),
+          endAdornment: searchValue && (
+            <InputAdornment position="end">
+              <IconButton 
+                size="small" 
+                onClick={handleClearSearch}
+                edge="end"
+                onMouseDown={(e) => e.preventDefault()}
+              >
+                <Clear />
+              </IconButton>
+            </InputAdornment>
+          )
         }}
+        helperText="Type to search - results update automatically"
         sx={{ mb: 3 }}
+        autoComplete="off"
       />
 
       {/* Category Filter */}
       <FormControl fullWidth sx={{ mb: 3 }}>
         <InputLabel>Category</InputLabel>
         <Select
-          value={localFilters.category}
+          value={filters.category || ''}
           label="Category"
-          onChange={(e) => handleFilterChange('category', e.target.value)}
+          onChange={(e) => handleImmediateFilterChange('category', e.target.value)}
         >
           <MenuItem value="">All Categories</MenuItem>
           {categories.map(category => (
@@ -194,9 +225,9 @@ const ProductsPage = () => {
       <FormControl fullWidth sx={{ mb: 3 }}>
         <InputLabel>Product Type</InputLabel>
         <Select
-          value={localFilters.productType}
+          value={filters.productType || ''}
           label="Product Type"
-          onChange={(e) => handleFilterChange('productType', e.target.value)}
+          onChange={(e) => handleImmediateFilterChange('productType', e.target.value)}
         >
           <MenuItem value="">All Types</MenuItem>
           {productTypes.map(type => (
@@ -211,12 +242,12 @@ const ProductsPage = () => {
       <FormControl fullWidth sx={{ mb: 3 }}>
         <InputLabel>Brand</InputLabel>
         <Select
-          value={localFilters.brand}
+          value={filters.brand || ''}
           label="Brand"
-          onChange={(e) => handleFilterChange('brand', e.target.value)}
+          onChange={(e) => handleImmediateFilterChange('brand', e.target.value)}
         >
           <MenuItem value="">All Brands</MenuItem>
-          {availableFilters.brands.map(brand => (
+          {availableFilters.brands?.map(brand => (
             <MenuItem key={brand} value={brand}>
               {brand}
             </MenuItem>
@@ -235,6 +266,7 @@ const ProductsPage = () => {
             localFilters.maxPrice || availableFilters.priceRange?.maxPrice || 1000
           ]}
           onChange={handlePriceChange}
+          onChangeCommitted={handlePriceChangeComplete}
           valueLabelDisplay="auto"
           min={availableFilters.priceRange?.minPrice || 0}
           max={availableFilters.priceRange?.maxPrice || 1000}
@@ -254,9 +286,9 @@ const ProductsPage = () => {
       <FormControl fullWidth sx={{ mb: 3 }}>
         <InputLabel>Minimum Rating</InputLabel>
         <Select
-          value={localFilters.minRating || ''}
+          value={filters.minRating || ''}
           label="Minimum Rating"
-          onChange={(e) => handleFilterChange('minRating', e.target.value)}
+          onChange={(e) => handleImmediateFilterChange('minRating', e.target.value)}
         >
           <MenuItem value="">Any Rating</MenuItem>
           <MenuItem value="4">4★ & above</MenuItem>
@@ -269,8 +301,8 @@ const ProductsPage = () => {
       <FormControlLabel
         control={
           <Checkbox
-            checked={localFilters.inStock === 'true'}
-            onChange={(e) => handleFilterChange('inStock', e.target.checked ? 'true' : '')}
+            checked={filters.inStock === 'true'}
+            onChange={(e) => handleImmediateFilterChange('inStock', e.target.checked ? 'true' : '')}
           />
         }
         label="In Stock Only"
@@ -281,8 +313,8 @@ const ProductsPage = () => {
       <FormControlLabel
         control={
           <Checkbox
-            checked={localFilters.featured === 'true'}
-            onChange={(e) => handleFilterChange('featured', e.target.checked ? 'true' : '')}
+            checked={filters.featured === 'true'}
+            onChange={(e) => handleImmediateFilterChange('featured', e.target.checked ? 'true' : '')}
           />
         }
         label="Featured Products Only"
@@ -295,9 +327,9 @@ const ProductsPage = () => {
       <FormControl fullWidth sx={{ mb: 2 }}>
         <InputLabel>Sort By</InputLabel>
         <Select
-          value={localFilters.sortBy}
+          value={filters.sortBy || 'createdAt'}
           label="Sort By"
-          onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+          onChange={(e) => handleImmediateFilterChange('sortBy', e.target.value)}
         >
           <MenuItem value="createdAt">Newest</MenuItem>
           <MenuItem value="price">Price</MenuItem>
@@ -309,9 +341,9 @@ const ProductsPage = () => {
       <FormControl fullWidth sx={{ mb: 3 }}>
         <InputLabel>Sort Order</InputLabel>
         <Select
-          value={localFilters.sortOrder}
+          value={filters.sortOrder || 'desc'}
           label="Sort Order"
-          onChange={(e) => handleFilterChange('sortOrder', e.target.value)}
+          onChange={(e) => handleImmediateFilterChange('sortOrder', e.target.value)}
         >
           <MenuItem value="desc">Descending</MenuItem>
           <MenuItem value="asc">Ascending</MenuItem>
@@ -326,18 +358,11 @@ const ProductsPage = () => {
           onClick={handleResetFilters}
           fullWidth
         >
-          Reset
-        </Button>
-        <Button
-          variant="contained"
-          onClick={applyFilters}
-          fullWidth
-        >
-          Apply
+          Reset All
         </Button>
       </Box>
     </Box>
-  );
+  ), [isMobile, searchValue, handleSearchChange, handleClearSearch, filters, handleImmediateFilterChange, availableFilters, localFilters, handlePriceChange, handlePriceChangeComplete, handleResetFilters]);
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -362,7 +387,7 @@ const ProductsPage = () => {
         {!isMobile && (
           <Grid item xs={12} md={3}>
             <Paper elevation={2} sx={{ p: 3, position: 'sticky', top: 100 }}>
-              <FilterContent />
+              {FilterContent}
             </Paper>
           </Grid>
         )}
@@ -397,24 +422,31 @@ const ProductsPage = () => {
             {/* Active Filters */}
             {activeFiltersCount > 0 && (
               <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {filters.search && (
+                  <Chip 
+                    label={`Search: ${filters.search}`}
+                    onDelete={handleClearSearch}
+                    size="small"
+                  />
+                )}
                 {filters.category && (
                   <Chip 
                     label={`Category: ${filters.category}`}
-                    onDelete={() => handleFilterChange('category', '')}
+                    onDelete={() => handleImmediateFilterChange('category', '')}
                     size="small"
                   />
                 )}
                 {filters.productType && (
                   <Chip 
                     label={`Type: ${productTypes.find(t => t.value === filters.productType)?.label || filters.productType}`}
-                    onDelete={() => handleFilterChange('productType', '')}
+                    onDelete={() => handleImmediateFilterChange('productType', '')}
                     size="small"
                   />
                 )}
                 {filters.brand && (
                   <Chip 
                     label={`Brand: ${filters.brand}`}
-                    onDelete={() => handleFilterChange('brand', '')}
+                    onDelete={() => handleImmediateFilterChange('brand', '')}
                     size="small"
                   />
                 )}
@@ -422,8 +454,8 @@ const ProductsPage = () => {
                   <Chip 
                     label={`Price: $${filters.minPrice || 0} - $${filters.maxPrice || '∞'}`}
                     onDelete={() => {
-                      handleFilterChange('minPrice', '');
-                      handleFilterChange('maxPrice', '');
+                      handleImmediateFilterChange('minPrice', '');
+                      handleImmediateFilterChange('maxPrice', '');
                     }}
                     size="small"
                   />
@@ -431,31 +463,31 @@ const ProductsPage = () => {
                 {filters.minRating && (
                   <Chip 
                     label={`${filters.minRating}★ & above`}
-                    onDelete={() => handleFilterChange('minRating', '')}
+                    onDelete={() => handleImmediateFilterChange('minRating', '')}
                     size="small"
                   />
                 )}
                 {filters.inStock === 'true' && (
                   <Chip 
                     label="In Stock Only"
-                    onDelete={() => handleFilterChange('inStock', '')}
+                    onDelete={() => handleImmediateFilterChange('inStock', '')}
                     size="small"
                   />
                 )}
                 {filters.featured === 'true' && (
                   <Chip 
                     label="Featured"
-                    onDelete={() => handleFilterChange('featured', '')}
+                    onDelete={() => handleImmediateFilterChange('featured', '')}
                     size="small"
                   />
                 )}
-                {filters.search && (
-                  <Chip 
-                    label={`Search: ${filters.search}`}
-                    onDelete={() => handleFilterChange('search', '')}
-                    size="small"
-                  />
-                )}
+                <Button 
+                  size="small" 
+                  onClick={handleResetFilters}
+                  startIcon={<Clear />}
+                >
+                  Clear All
+                </Button>
               </Box>
             )}
           </Paper>
@@ -516,7 +548,7 @@ const ProductsPage = () => {
         PaperProps={{ sx: { height: '85%', borderRadius: '16px 16px 0 0' } }}
       >
         <Box sx={{ overflow: 'auto', p: 2 }}>
-          <FilterContent />
+          {FilterContent}
         </Box>
       </Drawer>
     </Container>

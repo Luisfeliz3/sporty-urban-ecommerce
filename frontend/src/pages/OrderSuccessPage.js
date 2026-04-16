@@ -106,7 +106,7 @@ const OrderSuccessPage = () => {
           <Button
             variant="contained"
             component={Link}
-            to="/profile"
+            to="/orders"
           >
             View Orders
           </Button>
